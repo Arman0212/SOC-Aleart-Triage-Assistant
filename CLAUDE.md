@@ -20,7 +20,8 @@ listed in `pyproject.toml`; use only those.
 
 - Phase 0 (foundation) is done: the data contract, loaders, sample batch, tests, CI and docs.
 - Phase 1 (synthetic data generator) is done.
-- The pipeline packages are still empty.
+- Phase 2 (correlation) is done.
+- `attack`, `scoring`, `briefing` and `storage` are still empty.
 
 ## Architecture
 
@@ -48,7 +49,17 @@ ingestion  correlation  attack      scoring  briefing  Streamlit + storage
   - `DataFileError`, whose messages start with `path:line`
 - `evaluation/ground_truth.py`: `load_ground_truth`, the only place labels are read, and
   `write_ground_truth`, which the generator uses.
-- `correlation`, `attack`, `scoring`, `briefing`, `storage`: pipeline stages, not yet implemented.
+- `core/config.py`: `PipelineConfig` for `configs/pipeline.yaml`, with one section per stage.
+  Only `correlation` exists so far.
+- `correlation`:
+  - `correlate()` / `run_correlation()` turn alerts into incidents, using role-based linking,
+    data-driven hubs and recurrence.
+  - `CorrelationResult` holds the link reasons and the hub stats.
+  - See `docs/architecture.md#correlation` and `docs/correlation_tuning.md`.
+- `evaluation/metrics.py`: scenario completeness and purity, and incident stats.
+- `evaluation/sweep_correlation.py`: the tuning sweep. It tunes on seeds 101–105 and holds out
+  seed 42.
+- `attack`, `scoring`, `briefing`, `storage`: pipeline stages, not yet implemented.
 - An `Incident` is enriched step by step: `techniques`, then `score`, then `brief`, then `status`.
 
 The batch format is three files plus a manifest:
@@ -93,6 +104,8 @@ pre-commit install           # optional: run ruff on every commit
 pytest                       # all tests
 pytest tests/unit            # unit tests only
 python -m nullpunkt.generator --out data/generated/batch-001   # generate a 3,000-alert shift
+python -m nullpunkt.correlation --batch data/generated/batch-001   # correlate it into incidents
+python -m nullpunkt.evaluation.sweep_correlation   # re-tune correlation (~100 s)
 ruff check .                 # lint
 ruff format .                # format (CI runs `ruff format --check .`)
 ```
