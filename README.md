@@ -35,7 +35,8 @@ assets.csv  ──┴─► ingest ─► correlate ─► map ATT&CK ─► ran
 labels.csv ───────────────────────────► evaluation (offline) ◄──────── decisions ◄───┘
 ```
 
-- **Stack:** Python, pandas, networkx, Streamlit, SQLite, Microsoft Phi via Ollama, Azure.
+- **Stack:** Python, pandas, networkx, Streamlit, SQLite, Microsoft Phi via Ollama.
+- **Deployment target:** Azure (details in Phase 8).
 - **Package:** each stage is a subpackage of `src/nullpunkt/`.
 - **Data contract:** every package shares the Pydantic models in `core/schema.py`.
 - **Ground truth:** labels are kept in a separate file that only the evaluation package may read,
@@ -90,12 +91,16 @@ assets = load_assets("data/sample/assets.csv")  # 9 hosts keyed by name
 
 ## Project status
 
-| Phase | Scope | Status |
-|---|---|---|
-| 0 · Foundation | data contract, loaders, sample batch, tests, CI, docs | done |
-| 1 · Pipeline | generator, correlation, ATT&CK mapping, scoring | not started |
-| 2 · Briefs and review | Phi briefs, SQLite storage, Streamlit app | not started |
-| 3 · Evaluation | detection metrics, MTTT before vs after | not started |
+Phase 0 (foundation) is done. The later phases are listed in the project plan.
+
+| Component | Status |
+|---|---|
+| Data contract, loaders, sample batch, tests, CI, docs | done |
+| Generator, correlation, ATT&CK mapping | not started |
+| Scoring (formula lands in Phase 3) | not started |
+| Phi briefs, SQLite storage, Streamlit app | not started |
+| Evaluation: detection metrics, MTTT before vs after | not started |
+| Azure deployment (Phase 8) | not started |
 
 ## Contributing
 

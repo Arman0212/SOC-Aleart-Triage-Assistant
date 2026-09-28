@@ -11,9 +11,9 @@ every package depends on it.
 
 - **Unknown fields are an error.** Every model inherits `ContractModel`
   (`extra="forbid"`), so a typo like `serverity` fails validation instead of being dropped.
-- **Timestamps are timezone-aware.** A naive timestamp such as `2026-10-01T09:00:00` is rejected.
-  Always write UTC with a `Z` suffix: `2026-10-01T09:00:00Z`. (The validator accepts any explicit
-  offset, e.g. `+05:30`, but our own files use UTC only.)
+- **Timestamps are UTC.** A naive timestamp such as `2026-10-01T09:00:00` is rejected. A
+  timestamp with an explicit offset is converted to UTC, so `2026-10-01T14:30:00+05:30` becomes
+  `2026-10-01T09:00:00Z`. Write UTC with a `Z` suffix in files.
 - **IP addresses** are checked with `ipaddress.ip_address`, so IPv4 and IPv6 are both accepted.
 - **Enums are lowercase strings** (`StrEnum`) in files and JSON.
 
@@ -51,8 +51,8 @@ Batches:
 | Scenario | `SCN-` + 2 digits (`^SCN-\d{2}$`) | `SCN-01` | `GroundTruth.scenario_id` |
 | ATT&CK technique | `T` + 4 digits, optional `.` + 3-digit sub-technique (`^T\d{4}(\.\d{3})?$`) | `T1078`, `T1566.001` | `Technique.technique_id`, `GroundTruth.true_technique` |
 
-Tactic IDs (`TA0001`) are not technique IDs and are rejected. `Incident.alert_ids` and
-`Brief.techniques` hold these IDs but are not pattern-checked by the schema.
+Tactic IDs (`TA0001`) are not technique IDs and are rejected. The same patterns are also applied
+to each item of `Incident.alert_ids` (alert IDs) and `Brief.techniques` (technique IDs).
 
 ## Input models
 
@@ -119,9 +119,9 @@ The pipeline produces these. An `Incident` starts bare and is enriched stage by 
 | Field | Type | Default | Rules |
 |---|---|---|---|
 | `incident_id` | str | required | `INC-####` |
-| `alert_ids` | list[str] | required | at least one |
+| `alert_ids` | list[str] | required | at least one; each `ALR-######` |
 | `first_seen` | datetime | required | timezone-aware |
-| `last_seen` | datetime | required | timezone-aware |
+| `last_seen` | datetime | required | timezone-aware; not before `first_seen` |
 | `hosts` | list[str] | required | |
 | `users` | list[str] | `[]` | |
 | `ips` | list[str] | `[]` | |
@@ -153,7 +153,7 @@ Every score carries its components so an analyst can see why an incident ranks w
 | `explanation` | str | required | plain-language reason for the score |
 
 The schema only checks each field's range. It does not check that `risk_score` is consistent with
-the other components; the formula belongs to `nullpunkt.scoring`.
+the other components. The formula belongs to `nullpunkt.scoring` and is not fixed yet (Phase 3).
 
 ### Brief
 
@@ -163,12 +163,12 @@ A shift brief for one incident, written by Phi or by a template fallback.
 |---|---|---|
 | `summary` | str | |
 | `affected_assets` | list[str] | host names |
-| `techniques` | list[str] | ATT&CK technique IDs |
+| `techniques` | list[str] | ATT&CK technique IDs, each `T####` or `T####.###` |
 | `timeline` | list[str] | one entry per event |
 | `next_action` | str | the recommended next step |
 | `confidence` | `Confidence` | `low`, `medium`, `high` |
 | `generated_by` | `BriefSource` | `llm` or `template` |
-| `validated` | bool | whether the brief passed the briefing package's checks |
+| `validated` | bool | `True` only if every host in `affected_assets` appears in `Incident.hosts` and every ID in `techniques` appears in `Incident.techniques`; otherwise the template fallback is used |
 
 All fields are required.
 
@@ -182,11 +182,12 @@ One analyst action on one incident. Mean time to triage (MTTT) is computed from 
 | `action` | `DecisionAction` | required | `approve`, `edit`, `dismiss`, `escalate` |
 | `analyst` | str | required | |
 | `opened_at` | datetime | required | timezone-aware |
-| `decided_at` | datetime | required | timezone-aware |
+| `decided_at` | datetime | required | timezone-aware; not before `opened_at` |
 | `edited_brief` | str or null | `null` | the analyst's version when `action` is `edit` |
 | `notes` | str or null | `null` | |
 
-`triage_seconds` is a computed property, `decided_at - opened_at` in seconds. It is not stored.
+`triage_seconds` is a computed property, `decided_at - opened_at` in seconds. It is not stored,
+and it is never negative because the schema rejects `decided_at` earlier than `opened_at`.
 
 ## Why labels live in a separate file
 

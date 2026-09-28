@@ -55,7 +55,8 @@ Shared types and constants live in `core`.
 
 Correlation groups alerts into incidents using a networkx graph whose nodes are alerts and whose
 edges are shared entities such as a host, user or IP. Mapping runs before ranking because the
-score's `stage_multiplier` depends on where the techniques sit in the kill chain.
+score's `stage_multiplier` depends on where the techniques sit in the kill chain. The deck presents
+Rank before Map as the narrative order, but execution maps first because scoring uses tactics.
 
 ## How an Incident is enriched
 
@@ -82,7 +83,7 @@ finance database. `ScoreBreakdown` therefore combines:
 - `noise_penalty`, for rules that fire often and are usually benign
 
 It stores each component next to the final `risk_score` so the ranking can be explained. The exact
-formula is owned by `scoring` and has not been fixed yet.
+formula is owned by `scoring` and is not fixed yet (Phase 3).
 
 The sample batch's scenario SCN-01 is built to prove this. Its alerts are all LOW or MEDIUM and
 end on FINDB01 (criticality 5), while the loudest alerts in the batch are HIGH or CRITICAL false
@@ -93,8 +94,8 @@ buries SCN-01 and ranking by severity × criticality puts it at the top.
 
 - `briefing` asks Phi (the `OLLAMA_MODEL` served at `OLLAMA_HOST`) for a structured brief.
 - If the model is unavailable, or its output fails validation, `briefing` falls back to a
-  template brief. `Brief.generated_by` records which path produced it, and `Brief.validated`
-  records whether the brief passed the checks.
+  template brief. `Brief.generated_by` records which path produced it.
+- `Brief.validated` is `True` only if every host in `affected_assets` appears in `Incident.hosts` and every ID in `techniques` appears in `Incident.techniques`; otherwise the template fallback is used.
 - In the Streamlit app, the analyst approves, edits, dismisses or escalates each incident. Every
   action is stored as a `Decision`, whose `triage_seconds` feeds the MTTT measurement.
 
