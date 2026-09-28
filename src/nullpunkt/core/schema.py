@@ -18,6 +18,7 @@ SCHEMA_VERSION = "1.0"
 ALERT_ID_PATTERN = r"^ALR-\d{6}$"
 INCIDENT_ID_PATTERN = r"^INC-\d{4}$"
 TECHNIQUE_PATTERN = r"^T\d{4}(\.\d{3})?$"
+SCENARIO_ID_PATTERN = r"^SCN-\d{2}$"
 
 
 class Source(StrEnum):
@@ -115,6 +116,98 @@ class GroundTruth(ContractModel):
     """Hidden label for one alert. Only nullpunkt.evaluation may load these."""
 
     alert_id: str = Field(pattern=ALERT_ID_PATTERN)
-    scenario_id: str | None = None
+    scenario_id: str | None = Field(default=None, pattern=SCENARIO_ID_PATTERN)
     is_true_positive: bool
     true_technique: str | None = Field(default=None, pattern=TECHNIQUE_PATTERN)
+
+
+class IncidentStatus(StrEnum):
+    OPEN = "open"
+    APPROVED = "approved"
+    DISMISSED = "dismissed"
+    ESCALATED = "escalated"
+
+
+class DecisionAction(StrEnum):
+    APPROVE = "approve"
+    EDIT = "edit"
+    DISMISS = "dismiss"
+    ESCALATE = "escalate"
+
+
+class Confidence(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class BriefSource(StrEnum):
+    LLM = "llm"
+    TEMPLATE = "template"
+
+
+class Technique(ContractModel):
+    technique_id: str = Field(pattern=TECHNIQUE_PATTERN)
+    name: str
+    tactic: str
+    confirmed: bool = True
+
+
+class ScoreBreakdown(ContractModel):
+    severity_weight: int = Field(ge=1, le=4)
+    asset_criticality: int = Field(ge=1, le=5)
+    stage_multiplier: float = Field(ge=1.0)
+    noise_penalty: float = Field(default=1.0, gt=0, le=1.0)
+    risk_score: float = Field(ge=0, le=100)
+    explanation: str
+
+
+class Brief(ContractModel):
+    summary: str
+    affected_assets: list[str]
+    techniques: list[str]
+    timeline: list[str]
+    next_action: str
+    confidence: Confidence
+    generated_by: BriefSource
+    validated: bool
+
+
+class Incident(ContractModel):
+    incident_id: str = Field(pattern=INCIDENT_ID_PATTERN)
+    alert_ids: list[str] = Field(min_length=1)
+    first_seen: datetime
+    last_seen: datetime
+    hosts: list[str]
+    users: list[str] = []
+    ips: list[str] = []
+    techniques: list[Technique] = []
+    score: ScoreBreakdown | None = None
+    brief: Brief | None = None
+    status: IncidentStatus = IncidentStatus.OPEN
+
+    @field_validator("first_seen", "last_seen")
+    @classmethod
+    def _utc(cls, v: datetime) -> datetime:
+        return require_utc(v)
+
+
+class Decision(ContractModel):
+    """One analyst action. MTTT is computed from these records."""
+
+    incident_id: str = Field(pattern=INCIDENT_ID_PATTERN)
+    action: DecisionAction
+    analyst: str
+    opened_at: datetime
+    decided_at: datetime
+    edited_brief: str | None = None
+    notes: str | None = None
+
+    @field_validator("opened_at", "decided_at")
+    @classmethod
+    def _utc(cls, v: datetime) -> datetime:
+        return require_utc(v)
+
+    @property
+    def triage_seconds(self) -> float:
+        return (self.decided_at - self.opened_at).total_seconds()
