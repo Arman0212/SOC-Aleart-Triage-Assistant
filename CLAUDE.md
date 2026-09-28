@@ -21,7 +21,8 @@ listed in `pyproject.toml`; use only those.
 - Phase 0 (foundation) is done: the data contract, loaders, sample batch, tests, CI and docs.
 - Phase 1 (synthetic data generator) is done.
 - Phase 2 (correlation) is done.
-- `attack`, `scoring`, `briefing` and `storage` are still empty.
+- Phases 3–4 (ATT&CK mapping, risk scoring, the pipeline orchestrator) are done.
+- `briefing` and `storage` are still empty.
 
 ## Architecture
 
@@ -59,7 +60,21 @@ ingestion  correlation  attack      scoring  briefing  Streamlit + storage
 - `evaluation/metrics.py`: scenario completeness and purity, and incident stats.
 - `evaluation/sweep_correlation.py`: the tuning sweep. It tunes on seeds 101–105 and holds out
   seed 42.
-- `attack`, `scoring`, `briefing`, `storage`: pipeline stages, not yet implemented.
+- `core/detection_rules.py` also gives each rule its ATT&CK `tactic` and its `asset_at_risk`
+  (`host` or `source`).
+- `attack`:
+  - `reference.py` loads the committed ATT&CK v19.2 subset (15 tactics), package data built by
+    `scripts/build_attack_subset.py`.
+  - `mapping.py`: `map_incident` / `map_incidents`.
+- `scoring/engine.py`: `build_context`, `score_incident`, `asset_at_risk`, `rank` and
+  `priority_tier` (P1–P4). See `docs/scoring_evaluation.md`.
+- `pipeline.py`: `run(batch_dir)` / `process(alerts, assets)` run ingest → correlate → map →
+  score → rank and return a `PipelineResult`.
+- `evaluation`:
+  - `metrics.py` also has `ranking_metrics`.
+  - `baselines.py`: severity-only and alert-count orderings.
+  - `sweep_scoring.py`: tuning on seeds 101–105, with seed 42 held out.
+- `briefing`, `storage`: pipeline stages, not yet implemented.
 - An `Incident` is enriched step by step: `techniques`, then `score`, then `brief`, then `status`.
 
 The batch format is three files plus a manifest:
@@ -105,6 +120,8 @@ pytest                       # all tests
 pytest tests/unit            # unit tests only
 python -m nullpunkt.generator --out data/generated/batch-001   # generate a 3,000-alert shift
 python -m nullpunkt.correlation --batch data/generated/batch-001   # correlate it into incidents
+python -m nullpunkt.pipeline --batch data/generated/batch-001      # full ranking: top 10 + tiers
+python -m nullpunkt.evaluation.sweep_scoring                       # re-tune scoring (~5 s)
 python -m nullpunkt.evaluation.sweep_correlation   # re-tune correlation (~4-5 min)
 ruff check .                 # lint
 ruff format .                # format (CI runs `ruff format --check .`)
