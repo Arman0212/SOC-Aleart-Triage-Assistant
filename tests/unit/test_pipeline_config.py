@@ -17,10 +17,10 @@ def test_repo_config_matches_defaults():
 def test_tuned_defaults():
     c = CorrelationConfig()
     assert (c.window_minutes, c.hub_min_share, c.hub_min_users, c.hub_min_fanout) == (
-        120,
-        0.06,
-        4,
-        4,
+        150,
+        0.08,
+        6,
+        6,
     )
     assert c.recurrence_max_gap_minutes is None
     assert c.hub_actor_routine is True
@@ -40,7 +40,7 @@ def test_partial_section_overrides(tmp_path):
     c = load_pipeline_config(path).correlation
     assert c.window_minutes == 45
     assert c.internal_networks == (IPv4Network("10.0.0.0/8"),)
-    assert c.hub_min_users == 4
+    assert c.hub_min_users == CorrelationConfig().hub_min_users
 
 
 @pytest.mark.parametrize(

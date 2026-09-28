@@ -3,7 +3,7 @@
 Thresholds (see docs/correlation_tuning.md):
 - every scenario complete (1.0);
 - purity >= 0.9, except SCN-05 >= 0.05 (its user also has password-typo noise, by design);
-- 50-75 incidents (the tuned result, 68, is inside the requested range);
+- 50-75 incidents (the tuned result, 65, is inside the requested range);
 - largest incident <= 10 %, and every incident above 5 % is one recurring activity;
 - 3,000 alerts correlated in under 2 seconds.
 """
@@ -18,7 +18,15 @@ from nullpunkt.correlation.cli import main
 from nullpunkt.correlation.engine import correlate, run_correlation
 from nullpunkt.evaluation.ground_truth import load_ground_truth
 from nullpunkt.evaluation.metrics import correlation_metrics, is_single_activity
-from nullpunkt.evaluation.sweep_correlation import evaluate, make_batch, markdown, sweep
+from nullpunkt.evaluation.sweep_correlation import (
+    GRID,
+    evaluate,
+    grid_neighbours,
+    make_batch,
+    margin_lines,
+    markdown,
+    sweep,
+)
 from nullpunkt.generator.batch import generate, write_batch
 from nullpunkt.generator.config import SCENARIO_IDS, GeneratorConfig
 from nullpunkt.ingestion.loader import load_alerts, load_assets
@@ -124,8 +132,55 @@ def test_cli_needs_only_alerts_and_assets(batch_dir, tmp_path, capsys):
         shutil.copy(batch_dir / name, blind / name)
     assert main(["--batch", str(blind), "--top", "3"]) == 0
     out = capsys.readouterr().out
-    assert "3000 alerts -> 68 incidents" in out
+    assert "3000 alerts -> 65 incidents" in out
     assert "Detected hubs" in out and "host:DC01" in out
+
+
+TUNED = {key: getattr(CorrelationConfig(), key) for key in GRID}
+
+
+def test_tuned_defaults_are_on_the_grid():
+    for key, value in TUNED.items():
+        assert value in GRID[key], key
+
+
+@pytest.mark.parametrize(
+    "perturbed",
+    grid_neighbours(TUNED),
+    ids=lambda p: ",".join(f"{k}={v}" for k, v in p.items() if TUNED[k] != v),
+)
+def test_every_scenario_survives_one_step_perturbation(batch_dir, perturbed):
+    """Move each tuned parameter one grid step in each direction and check that all seven
+    scenarios stay complete on seed 42, so the demo never sits on a knife edge.
+
+    Two parameters are perturbed in one direction only, because the tuned value is the end of
+    its range by nature: "no recurrence gap" (recurrence_max_gap_minutes=None) can only move to
+    a finite gap, and "routine on" (hub_actor_routine=True) can only be switched off. The numeric
+    thresholds (window, hub share, hub users, hub fan-out) are interior grid points and are
+    perturbed both ways.
+
+    Only completeness is asserted. Purity is not: one step up in hub users or hub fan-out keeps
+    every scenario whole but merges SCN-06 or SCN-01 into noise (docs/correlation_tuning.md).
+    """
+    alerts = load_alerts(batch_dir / "alerts.jsonl")
+    assets = load_assets(batch_dir / "assets.csv")
+    labels = load_ground_truth(batch_dir / "labels.csv")
+    incidents = correlate(alerts, assets, CorrelationConfig(**perturbed))
+    metrics = correlation_metrics(incidents, labels)
+    assert sorted(metrics.scenarios) == list(SCENARIO_IDS)
+    broken = {s: v.completeness for s, v in metrics.scenarios.items() if v.completeness < 1.0}
+    assert not broken, broken
+
+
+def test_perturbations_cover_every_parameter_both_ways_where_possible():
+    moved = {}
+    for p in grid_neighbours(TUNED):
+        (key,) = [k for k in p if p[k] != TUNED[k]]
+        moved.setdefault(key, []).append(p[key])
+    assert set(moved) == set(GRID)
+    one_way = {"recurrence_max_gap_minutes", "hub_actor_routine"}
+    for key, values in moved.items():
+        assert len(values) == (1 if key in one_way else 2), (key, values)
 
 
 def test_sweep_smoke():
@@ -143,3 +198,9 @@ def test_sweep_smoke():
     text = markdown(ranked, evaluate(batch, CorrelationConfig()))
     assert text.count("\n| ") >= 2 + 7
     assert "Held-out seed 42" in text
+
+    margins = margin_lines([batch], CorrelationConfig())
+    assert margins[2] == "| host:WEB02 | 42 | 170 | 5.7% (8%) | 3 (6) | 1 (6) | no |"
+    assert "Hub-threshold margins" in markdown(
+        ranked, evaluate(batch, CorrelationConfig()), 2, margins
+    )

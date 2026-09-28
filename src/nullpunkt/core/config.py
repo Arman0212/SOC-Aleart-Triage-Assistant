@@ -24,16 +24,16 @@ class CorrelationConfig(_Section):
     docs/correlation_tuning.md."""
 
     # Linking: an alert links to the previous alert sharing an entity within this window.
-    window_minutes: float = Field(default=120, gt=0)
+    window_minutes: float = Field(default=150, gt=0)
 
     # Hub detection. An entity is a hub if ANY of these holds.
-    hub_min_share: float = Field(default=0.06, gt=0, le=1)
+    hub_min_share: float = Field(default=0.08, gt=0, le=1)
     """...it appears in at least this share of all alerts (and in at least ``hub_min_alerts``
     alerts, so a small batch does not turn everything into a hub)."""
     hub_min_alerts: int = Field(default=20, ge=1)
-    hub_min_users: int = Field(default=4, ge=2)
+    hub_min_users: int = Field(default=6, ge=2)
     """...it co-occurs with at least this many distinct users (non-user entities)."""
-    hub_min_fanout: int = Field(default=4, ge=2)
+    hub_min_fanout: int = Field(default=6, ge=2)
     """...as an actor (user or source) it acts on at least this many distinct hosts."""
     hub_hint_types: tuple[AssetType, ...] = (
         AssetType.DOMAIN_CONTROLLER,

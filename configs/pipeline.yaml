@@ -1,11 +1,11 @@
 # Pipeline settings, one section per stage. Values are the tuned defaults; see
 # docs/correlation_tuning.md for how they were chosen.
 correlation:
-  window_minutes: 120
-  hub_min_share: 0.06
+  window_minutes: 150
+  hub_min_share: 0.08
   hub_min_alerts: 20
-  hub_min_users: 4
-  hub_min_fanout: 4
+  hub_min_users: 6
+  hub_min_fanout: 6
   hub_hint_types: [domain_controller, proxy, vuln_scanner, backup_server, software_distribution]
   hub_hint_min_share: 0.01
   internal_networks: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
