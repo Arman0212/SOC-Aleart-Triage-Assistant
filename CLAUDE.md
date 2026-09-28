@@ -16,8 +16,11 @@ Nullpunkt is a SOC alert-triage tool built for Microsoft Innovate 2026, Problem 
 Phi via Ollama, Azure (deployment target; details in Phase 8). Runtime and dev dependencies are
 listed in `pyproject.toml`; use only those.
 
-**Status:** Phase 0 (foundation) is done: the data contract, loaders, sample batch, tests, CI and
-docs. The pipeline packages are still empty.
+**Status:**
+
+- Phase 0 (foundation) is done: the data contract, loaders, sample batch, tests, CI and docs.
+- Phase 1 (synthetic data generator) is done.
+- The pipeline packages are still empty.
 
 ## Architecture
 
@@ -32,18 +35,29 @@ ingestion  correlation  attack      scoring  briefing  Streamlit + storage
 - `core/schema.py`: the data contract (Pydantic v2). Every package imports its types from here.
   Input: `Alert`, `Asset`, `GroundTruth`. Output: `Incident`, `Technique`, `ScoreBreakdown`,
   `Brief`, `Decision`.
-- `generator`: writes synthetic batches to `data/generated/` (git-ignored).
-- `ingestion/loader.py`: `load_alerts`, `load_assets`, `write_alerts`, `read_csv_models`, and
-  `DataFileError`, whose messages start with `path:line`.
-- `evaluation/ground_truth.py`: `load_ground_truth`, the only place labels are read.
+- `core/detection_rules.py`: the rule catalog (rule name, source, severity, one ATT&CK
+  technique). The pipeline may use it; it never says whether a given alert is real.
+- `generator`: offline tooling that writes a deterministic synthetic shift to
+  `data/generated/<batch>/`, which is git-ignored.
+  - Modules: `config`, `inventory`, `scenarios` (data-driven steps), `noise` (clustered
+    categories), `messages` (templates), `batch`, `cli`.
+  - See `docs/scenarios.md`.
+- `ingestion/loader.py`:
+  - loaders: `load_alerts`, `load_assets`, `read_csv_models`
+  - writers: `write_alerts`, `write_assets`, `write_csv_models`
+  - `DataFileError`, whose messages start with `path:line`
+- `evaluation/ground_truth.py`: `load_ground_truth`, the only place labels are read, and
+  `write_ground_truth`, which the generator uses.
 - `correlation`, `attack`, `scoring`, `briefing`, `storage`: pipeline stages, not yet implemented.
 - An `Incident` is enriched step by step: `techniques`, then `score`, then `brief`, then `status`.
 
-The batch format is three files:
+The batch format is three files plus a manifest:
 
 - `alerts.jsonl`: one `Alert` per line
 - `assets.csv`: `Asset` rows
 - `labels.csv`: `GroundTruth` rows, for evaluation only
+- `manifest.json` (generated batches only): seed, config, counts and a scenario summary, for
+  evaluation only
 
 `data/sample/` is a small committed fixture with scenario SCN-01. Its attack uses only low/medium
 alerts but reaches the criticality-5 FINDB01, while the noise includes high-severity false
@@ -57,9 +71,12 @@ positives on criticality-1 laptops.
    changes uncommitted, and propose a commit plan; the user commits.
 2. **Do not modify `src/nullpunkt/core/schema.py`.** If it seems to need a change, stop and explain
    why to the user. Schema changes need team approval.
-3. **Ground truth never leaves `nullpunkt.evaluation`.** Pipeline code sees only `Alert` and
-   `Asset`, and never imports `GroundTruth` or `nullpunkt.evaluation` or reads `labels.csv`.
-   `tests/unit/test_ground_truth.py` enforces this.
+3. **Only `evaluation` reads labels; only `generator` writes them; pipeline code sees neither.**
+   - Pipeline and app code (ingestion, correlation, attack, scoring, briefing, storage, app)
+     sees only `Alert` and `Asset`.
+   - It never imports `GroundTruth`, `nullpunkt.evaluation` or `nullpunkt.generator`, and never
+     reads `labels.csv` or `manifest.json`.
+   - `tests/unit/test_ground_truth.py` enforces this.
 4. **All timestamps are timezone-aware UTC.** Write them as `...Z`, and use
    `datetime.now(UTC)`, never `datetime.now()` or `utcnow()`. The schema rejects naive datetimes
    and converts aware ones to UTC.
@@ -75,6 +92,7 @@ pre-commit install           # optional: run ruff on every commit
 
 pytest                       # all tests
 pytest tests/unit            # unit tests only
+python -m nullpunkt.generator --out data/generated/batch-001   # generate a 3,000-alert shift
 ruff check .                 # lint
 ruff format .                # format (CI runs `ruff format --check .`)
 ```
