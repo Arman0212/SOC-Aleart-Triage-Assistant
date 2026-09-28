@@ -58,5 +58,7 @@ approval**:
 
 ## Ground truth
 
-Only `nullpunkt.evaluation` may read `labels.csv` or use `GroundTruth`. Pipeline code must work
-from `Alert` and `Asset` alone. A test enforces this, so do not work around it.
+Only `nullpunkt.evaluation` reads `labels.csv` and `manifest.json`, and only
+`nullpunkt.generator` writes them. Pipeline and app code must work from `Alert` and `Asset`
+alone, and must not import `nullpunkt.evaluation` or `nullpunkt.generator`. Tests enforce this,
+so do not work around them.

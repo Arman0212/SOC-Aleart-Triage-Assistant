@@ -4,8 +4,9 @@ Nullpunkt turns a shift's worth of alerts (about 3,000) into about 60 ranked inc
 MITRE ATT&CK techniques, an explainable risk score and a short brief that an analyst approves.
 Types are defined in [data_contract.md](data_contract.md).
 
-> Status: Phase 0. The contract, loaders, sample batch and tests exist. The stages below are
-> the design; their packages are still empty.
+> Status: Phase 1. The contract, loaders, sample batch, tests and the synthetic data generator
+> ([scenarios.md](scenarios.md)) exist. Stages 1–5 below are the design; their packages are
+> still empty.
 
 ## Pipeline
 
@@ -41,7 +42,7 @@ evaluation compares pipeline output and analyst decisions against the labels.
 
 | # | Stage | Package | Reads | Produces |
 |---|---|---|---|---|
-| – | Generate | `generator` | – | `alerts.jsonl`, `assets.csv`, `labels.csv` in `data/generated/` |
+| – | Generate | `generator` | `configs/generator.yaml` | `alerts.jsonl`, `assets.csv`, `labels.csv`, `manifest.json` in `data/generated/<batch>/` |
 | 1 | Ingest | `ingestion` | batch files | validated `list[Alert]` (sorted by time) and `dict[str, Asset]` |
 | 2 | Correlate | `correlation` | alerts, assets | `Incident`s with `alert_ids`, `first_seen`, `last_seen`, `hosts`, `users`, `ips` |
 | 3 | Map | `attack` | incident + its alerts | `Incident.techniques` |
@@ -101,6 +102,12 @@ buries SCN-01 and ranking by severity × criticality puts it at the top.
 
 ## Ground-truth boundary
 
-Only `evaluation` may read `labels.csv` or use `GroundTruth`. Stages 1–5, `storage` and the app
-see only `Alert` and `Asset`. A unit test enforces this by parsing every module outside `core` and
-`evaluation`. See [data_contract.md](data_contract.md#why-labels-live-in-a-separate-file).
+Only `evaluation` reads labels, and only `generator` (offline tooling) writes them. Stages 1–5,
+`storage` and the app see only `Alert` and `Asset`. They never import `GroundTruth`,
+`nullpunkt.evaluation` or `nullpunkt.generator`, and never read `labels.csv` or `manifest.json`.
+
+Unit tests enforce this by parsing every module. See
+[data_contract.md](data_contract.md#why-labels-live-in-a-separate-file).
+
+The detection rule catalog (`core/detection_rules.py`) is not truth. It maps each rule to the one
+technique it detects, which a real SOC knows too, so the `attack` stage may use it.

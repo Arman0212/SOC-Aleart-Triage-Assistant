@@ -20,7 +20,9 @@ every package depends on it.
 ## Batch files
 
 A batch is a directory with three files. The pipeline reads the first two. Only
-`nullpunkt.evaluation` reads the third.
+`nullpunkt.evaluation` reads the third, and only the generator writes it. Generated batches
+also contain `manifest.json` (seed, config, counts and a per-scenario summary). It reveals the
+answers too, so it is evaluation-only as well; see [scenarios.md](scenarios.md).
 
 | File | Format | One record is | Loader | Who may read it |
 |---|---|---|---|---|
@@ -35,6 +37,8 @@ Loader behaviour:
 - Duplicate `alert_id`s (in alerts or labels) and duplicate `host`s (in assets) are rejected.
 - `load_alerts` skips blank lines and returns alerts sorted by `(timestamp, alert_id)`.
 - `write_alerts` writes every field, with `null` for missing values, so every line has the same keys.
+- `write_assets` and `write_ground_truth` write CSV with `\n` line endings, so output is
+  byte-identical on every OS.
 - In CSV files an empty cell means "no value" (`None`). Booleans are written `true` / `false`.
 
 Batches:
@@ -197,8 +201,9 @@ works if the pipeline cannot see the answers.
 - **No leakage.** If `is_true_positive` or `true_technique` were on `Alert`, a scorer or prompt
   could use them, even by accident, and every metric would be inflated. `Alert` has no label
   fields, and `extra="forbid"` means an alert line containing one fails to load.
-- **Enforced, not just agreed.** `tests/unit/test_ground_truth.py` fails if any package other
-  than `core` or `evaluation` imports `GroundTruth` or `nullpunkt.evaluation`, or mentions
-  `labels.csv`.
+- **Enforced, not just agreed.** `tests/unit/test_ground_truth.py` fails in two cases:
+  - A package other than `core`, `evaluation` or `generator` imports `GroundTruth` or
+    `nullpunkt.evaluation`, or mentions `labels.csv` or `manifest.json`.
+  - A package other than `evaluation` or `generator` imports `nullpunkt.generator`.
 - **Realistic input.** A real SOC receives alerts and an asset inventory, never labels. Keeping
   the same shape means the pipeline could run on real data unchanged.

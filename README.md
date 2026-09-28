@@ -78,7 +78,13 @@ ollama pull phi4-mini
 pytest               # run all tests
 ruff check .         # lint
 ruff format .        # format
+
+# generate a synthetic 3,000-alert shift (deterministic from the seed)
+python -m nullpunkt.generator --config configs/generator.yaml --seed 42 --out data/generated/batch-001
 ```
+
+The generated shift has 80 hosts and 7 injected intrusions hidden in clustered noise. See
+[docs/scenarios.md](docs/scenarios.md).
 
 Load the sample batch:
 
@@ -91,12 +97,14 @@ assets = load_assets("data/sample/assets.csv")  # 9 hosts keyed by name
 
 ## Project status
 
-Phase 0 (foundation) is done. The later phases are listed in the project plan.
+Phases 0 (foundation) and 1 (synthetic data generator) are done. The later phases are listed in
+the project plan.
 
 | Component | Status |
 |---|---|
 | Data contract, loaders, sample batch, tests, CI, docs | done |
-| Generator, correlation, ATT&CK mapping | not started |
+| Synthetic data generator (80 hosts, 3,000 alerts, 7 scenarios) | done |
+| Correlation, ATT&CK mapping | not started |
 | Scoring (formula lands in Phase 3) | not started |
 | Phi briefs, SQLite storage, Streamlit app | not started |
 | Evaluation: detection metrics, MTTT before vs after | not started |
