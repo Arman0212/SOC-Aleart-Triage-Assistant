@@ -19,6 +19,7 @@ dependencies = [
     "faker>=40.0,<41",
     "streamlit>=1.40",
     "ollama>=0.4",
+    "tzdata; sys_platform == \"win32\"",
 ]
 
 [project.scripts]
