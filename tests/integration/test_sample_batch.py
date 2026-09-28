@@ -4,6 +4,8 @@ SCN-01 is built so that ranking by raw severity buries the real attack under
 high-severity noise, while ranking by severity x asset criticality surfaces it.
 """
 
+import json
+
 import pytest
 
 from nullpunkt.core.schema import SEVERITY_WEIGHT, Alert, GroundTruth, Severity
@@ -124,3 +126,8 @@ def test_raw_alert_lines_carry_no_label_keys(sample_dir):
     text = (sample_dir / "alerts.jsonl").read_text()
     for key in ("scenario_id", "is_true_positive", "true_technique", "SCN-"):
         assert key not in text
+
+
+def test_alert_lines_have_identical_keys(sample_dir):
+    lines = (sample_dir / "alerts.jsonl").read_text().splitlines()
+    assert all(list(json.loads(line)) == list(Alert.model_fields) for line in lines)
