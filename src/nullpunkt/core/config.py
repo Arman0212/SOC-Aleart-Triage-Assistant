@@ -1,7 +1,7 @@
 """Pipeline configuration (configs/pipeline.yaml).
 
-One section per pipeline stage. Only ``correlation`` exists so far; scoring and briefing add
-their own sections here later.
+One section per pipeline stage: ``correlation`` and ``scoring`` so far; briefing adds its own
+section later.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from ipaddress import IPv4Network, IPv6Network
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from nullpunkt.core.schema import AssetType
 
@@ -69,8 +69,43 @@ class CorrelationConfig(_Section):
     scanner) into one routine incident, across rules."""
 
 
+class ScoringConfig(_Section):
+    """Settings for nullpunkt.scoring. Defaults are the tuned values from
+    docs/scoring_evaluation.md.
+
+    risk = 100 x (severity x criticality of the riskiest alert-on-asset / 20)
+               x (stage multiplier / its maximum) x noise penalty
+    """
+
+    stage_step: float = Field(default=1.0, gt=0)
+    """Stage multiplier = 1 + stage_step x (distinct tactics - 1), up to ``tactic_cap`` tactics."""
+    tactic_cap: int = Field(default=4, ge=2, le=15)
+    routine_min_hours: int = Field(default=3, ge=2)
+    """A (rule, actor) pair firing in at least this many different hours of the batch is routine."""
+    routine_penalty: float = Field(default=0.1, gt=0, le=1)
+    """Multiplier for incidents made only of routine alerts."""
+    relay_asset_types: tuple[AssetType, ...] = (
+        AssetType.DOMAIN_CONTROLLER,
+        AssetType.PROXY,
+        AssetType.MAIL_SERVER,
+        AssetType.VPN_GATEWAY,
+    )
+    """Infrastructure that carries other assets' traffic. A source-side alert on one of these
+    never takes its criticality; if the source cannot be resolved, criticality is 1."""
+    tier_thresholds: tuple[float, float, float] = (23.0, 6.2, 3.8)
+    """Minimum risk score for P1, P2 and P3; anything lower is P4. Fixed thresholds, not ranks."""
+
+    @model_validator(mode="after")
+    def _descending(self) -> ScoringConfig:
+        p1, p2, p3 = self.tier_thresholds
+        if not 0 < p3 < p2 < p1 <= 100:
+            raise ValueError("tier_thresholds must satisfy 0 < P3 < P2 < P1 <= 100")
+        return self
+
+
 class PipelineConfig(_Section):
     correlation: CorrelationConfig = CorrelationConfig()
+    scoring: ScoringConfig = ScoringConfig()
 
 
 def load_pipeline_config(path: str | Path) -> PipelineConfig:

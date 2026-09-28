@@ -4,7 +4,12 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from nullpunkt.core.config import CorrelationConfig, PipelineConfig, load_pipeline_config
+from nullpunkt.core.config import (
+    CorrelationConfig,
+    PipelineConfig,
+    ScoringConfig,
+    load_pipeline_config,
+)
 from nullpunkt.core.schema import AssetType
 
 REPO_CONFIG = Path(__file__).parents[2] / "configs" / "pipeline.yaml"
@@ -53,7 +58,7 @@ def test_partial_section_overrides(tmp_path):
         {"correlation": {"hub_hint_types": ["printer"]}},
         {"correlation": {"internal_networks": ["not-a-network"]}},
         {"correlation": {"typo": 1}},
-        {"scoring": {}},
+        {"briefing": {}},
     ],
 )
 def test_invalid(bad):
@@ -64,3 +69,18 @@ def test_invalid(bad):
 def test_sections_are_immutable():
     with pytest.raises(ValidationError):
         CorrelationConfig().window_minutes = 5  # type: ignore[misc]
+
+
+def test_scoring_defaults():
+    s = PipelineConfig().scoring
+    assert (s.stage_step, s.tactic_cap, s.routine_min_hours, s.routine_penalty) == (1.0, 4, 3, 0.1)
+    assert s.tier_thresholds == (23.0, 6.2, 3.8)
+    assert AssetType.MAIL_SERVER in s.relay_asset_types
+
+
+@pytest.mark.parametrize(
+    "thresholds", [(5.0, 6.2, 3.8), (23.0, 6.2, 6.2), (23.0, 6.2, 0.0), (120.0, 6.2, 3.8)]
+)
+def test_tier_thresholds_must_descend_within_0_100(thresholds):
+    with pytest.raises(ValidationError, match="tier_thresholds"):
+        ScoringConfig(tier_thresholds=thresholds)

@@ -14,3 +14,11 @@ correlation:
   recurrence_max_users: 1
   recurrence_max_gap_minutes: null
   hub_actor_routine: true
+
+scoring:
+  stage_step: 1.0
+  tactic_cap: 4
+  routine_min_hours: 3
+  routine_penalty: 0.1
+  relay_asset_types: [domain_controller, proxy, mail_server, vpn_gateway]
+  tier_thresholds: [23.0, 6.2, 3.8]   # P1, P2, P3 minimum risk scores
