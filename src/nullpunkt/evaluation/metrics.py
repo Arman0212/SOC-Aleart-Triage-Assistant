@@ -90,3 +90,38 @@ def is_single_activity(
 
     common = set.intersection(*(entities(alerts[a]) for a in incident.alert_ids))
     return bool(common)
+
+
+@dataclass(frozen=True)
+class RankingMetrics:
+    """How well an incident ordering surfaces the injected scenarios."""
+
+    scenario_ranks: dict[str, int]  # scenario -> rank (1-based) of its incident
+    incidents: int
+    precision_at_10: float  # share of the top 10 incidents that contain scenario alerts
+
+    @property
+    def mean_rank(self) -> float:
+        return sum(self.scenario_ranks.values()) / len(self.scenario_ranks)
+
+    @property
+    def worst_rank(self) -> int:
+        return max(self.scenario_ranks.values())
+
+    def found_in_top(self, k: int) -> int:
+        return sum(r <= k for r in self.scenario_ranks.values())
+
+
+def ranking_metrics(ordered: list[Incident], labels: dict[str, GroundTruth]) -> RankingMetrics:
+    """``ordered`` is the ranking, highest priority first. A scenario's incident is the one that
+    holds most of its alerts (as in ``correlation_metrics``)."""
+    scores = correlation_metrics(ordered, labels).scenarios
+    position = {inc.incident_id: n for n, inc in enumerate(ordered, start=1)}
+    scenario_alerts = {g.alert_id for g in labels.values() if g.scenario_id}
+    top = ordered[:10]
+    hits = sum(any(a in scenario_alerts for a in inc.alert_ids) for inc in top)
+    return RankingMetrics(
+        scenario_ranks={sid: position[s.incident_id] for sid, s in scores.items()},
+        incidents=len(ordered),
+        precision_at_10=hits / len(top) if top else 0.0,
+    )
