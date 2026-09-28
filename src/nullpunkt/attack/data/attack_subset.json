@@ -1,0 +1,324 @@
+{
+  "attack_version": "19.2",
+  "domain": "enterprise-attack",
+  "source": "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack-19.2.json",
+  "tactics": [
+    {
+      "id": "TA0043",
+      "shortname": "reconnaissance",
+      "name": "Reconnaissance"
+    },
+    {
+      "id": "TA0042",
+      "shortname": "resource-development",
+      "name": "Resource Development"
+    },
+    {
+      "id": "TA0001",
+      "shortname": "initial-access",
+      "name": "Initial Access"
+    },
+    {
+      "id": "TA0002",
+      "shortname": "execution",
+      "name": "Execution"
+    },
+    {
+      "id": "TA0003",
+      "shortname": "persistence",
+      "name": "Persistence"
+    },
+    {
+      "id": "TA0004",
+      "shortname": "privilege-escalation",
+      "name": "Privilege Escalation"
+    },
+    {
+      "id": "TA0005",
+      "shortname": "stealth",
+      "name": "Stealth"
+    },
+    {
+      "id": "TA0112",
+      "shortname": "defense-impairment",
+      "name": "Defense Impairment"
+    },
+    {
+      "id": "TA0006",
+      "shortname": "credential-access",
+      "name": "Credential Access"
+    },
+    {
+      "id": "TA0007",
+      "shortname": "discovery",
+      "name": "Discovery"
+    },
+    {
+      "id": "TA0008",
+      "shortname": "lateral-movement",
+      "name": "Lateral Movement"
+    },
+    {
+      "id": "TA0009",
+      "shortname": "collection",
+      "name": "Collection"
+    },
+    {
+      "id": "TA0011",
+      "shortname": "command-and-control",
+      "name": "Command and Control"
+    },
+    {
+      "id": "TA0010",
+      "shortname": "exfiltration",
+      "name": "Exfiltration"
+    },
+    {
+      "id": "TA0040",
+      "shortname": "impact",
+      "name": "Impact"
+    }
+  ],
+  "techniques": {
+    "T1003": {
+      "name": "OS Credential Dumping",
+      "tactics": [
+        "credential-access"
+      ]
+    },
+    "T1003.001": {
+      "name": "LSASS Memory",
+      "tactics": [
+        "credential-access"
+      ]
+    },
+    "T1003.006": {
+      "name": "DCSync",
+      "tactics": [
+        "credential-access"
+      ]
+    },
+    "T1005": {
+      "name": "Data from Local System",
+      "tactics": [
+        "collection"
+      ]
+    },
+    "T1021": {
+      "name": "Remote Services",
+      "tactics": [
+        "lateral-movement"
+      ]
+    },
+    "T1021.002": {
+      "name": "SMB/Windows Admin Shares",
+      "tactics": [
+        "lateral-movement"
+      ]
+    },
+    "T1039": {
+      "name": "Data from Network Shared Drive",
+      "tactics": [
+        "collection"
+      ]
+    },
+    "T1046": {
+      "name": "Network Service Discovery",
+      "tactics": [
+        "discovery"
+      ]
+    },
+    "T1059": {
+      "name": "Command and Scripting Interpreter",
+      "tactics": [
+        "execution"
+      ]
+    },
+    "T1059.001": {
+      "name": "PowerShell",
+      "tactics": [
+        "execution"
+      ]
+    },
+    "T1071": {
+      "name": "Application Layer Protocol",
+      "tactics": [
+        "command-and-control"
+      ]
+    },
+    "T1071.001": {
+      "name": "Web Protocols",
+      "tactics": [
+        "command-and-control"
+      ]
+    },
+    "T1078": {
+      "name": "Valid Accounts",
+      "tactics": [
+        "initial-access",
+        "persistence",
+        "privilege-escalation",
+        "stealth"
+      ]
+    },
+    "T1078.002": {
+      "name": "Domain Accounts",
+      "tactics": [
+        "initial-access",
+        "persistence",
+        "privilege-escalation",
+        "stealth"
+      ]
+    },
+    "T1087": {
+      "name": "Account Discovery",
+      "tactics": [
+        "discovery"
+      ]
+    },
+    "T1087.002": {
+      "name": "Domain Account",
+      "tactics": [
+        "discovery"
+      ]
+    },
+    "T1110": {
+      "name": "Brute Force",
+      "tactics": [
+        "credential-access"
+      ]
+    },
+    "T1110.001": {
+      "name": "Password Guessing",
+      "tactics": [
+        "credential-access"
+      ]
+    },
+    "T1190": {
+      "name": "Exploit Public-Facing Application",
+      "tactics": [
+        "initial-access"
+      ]
+    },
+    "T1204": {
+      "name": "User Execution",
+      "tactics": [
+        "execution"
+      ]
+    },
+    "T1204.002": {
+      "name": "Malicious File",
+      "tactics": [
+        "execution"
+      ]
+    },
+    "T1489": {
+      "name": "Service Stop",
+      "tactics": [
+        "impact"
+      ]
+    },
+    "T1490": {
+      "name": "Inhibit System Recovery",
+      "tactics": [
+        "impact"
+      ]
+    },
+    "T1505": {
+      "name": "Server Software Component",
+      "tactics": [
+        "persistence"
+      ]
+    },
+    "T1505.003": {
+      "name": "Web Shell",
+      "tactics": [
+        "persistence"
+      ]
+    },
+    "T1555": {
+      "name": "Credentials from Password Stores",
+      "tactics": [
+        "credential-access"
+      ]
+    },
+    "T1555.003": {
+      "name": "Credentials from Web Browsers",
+      "tactics": [
+        "credential-access"
+      ]
+    },
+    "T1558": {
+      "name": "Steal or Forge Kerberos Tickets",
+      "tactics": [
+        "credential-access"
+      ]
+    },
+    "T1558.003": {
+      "name": "Kerberoasting",
+      "tactics": [
+        "credential-access"
+      ]
+    },
+    "T1560": {
+      "name": "Archive Collected Data",
+      "tactics": [
+        "collection"
+      ]
+    },
+    "T1560.001": {
+      "name": "Archive via Utility",
+      "tactics": [
+        "collection"
+      ]
+    },
+    "T1566": {
+      "name": "Phishing",
+      "tactics": [
+        "initial-access"
+      ]
+    },
+    "T1566.001": {
+      "name": "Spearphishing Attachment",
+      "tactics": [
+        "initial-access"
+      ]
+    },
+    "T1567": {
+      "name": "Exfiltration Over Web Service",
+      "tactics": [
+        "exfiltration"
+      ]
+    },
+    "T1567.002": {
+      "name": "Exfiltration to Cloud Storage",
+      "tactics": [
+        "exfiltration"
+      ]
+    },
+    "T1569": {
+      "name": "System Services",
+      "tactics": [
+        "execution"
+      ]
+    },
+    "T1569.002": {
+      "name": "Service Execution",
+      "tactics": [
+        "execution"
+      ]
+    },
+    "T1595": {
+      "name": "Active Scanning",
+      "tactics": [
+        "reconnaissance"
+      ]
+    },
+    "T1595.001": {
+      "name": "Scanning IP Blocks",
+      "tactics": [
+        "reconnaissance"
+      ]
+    }
+  }
+}
