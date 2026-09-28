@@ -80,10 +80,12 @@ class TestAlert:
     def test_ipv6_accepted(self):
         assert Alert.model_validate(alert_data(src_ip="2001:db8::1")).src_ip == "2001:db8::1"
 
-    def test_non_utc_offset_is_aware_and_accepted(self):
+    def test_offset_normalised_to_utc(self):
         alert = Alert.model_validate(alert_data(timestamp="2026-10-01T14:30:00+05:30"))
-        assert alert.timestamp.utcoffset() == timedelta(hours=5, minutes=30)
+        assert alert.timestamp.utcoffset() == timedelta(0)
+        assert alert.timestamp.tzinfo is UTC
         assert alert.timestamp == datetime(2026, 10, 1, 9, tzinfo=UTC)
+        assert alert.model_dump_json().count('"2026-10-01T09:00:00Z"') == 1
 
     @pytest.mark.parametrize("ts", ["2026-10-01T09:00:00", datetime(2026, 10, 1, 9)])
     def test_naive_timestamp_rejected(self, ts):
@@ -309,6 +311,11 @@ class TestBrief:
         with pytest.raises(ValidationError):
             Brief.model_validate(brief_data(**{field: bad}))
 
+    @pytest.mark.parametrize("bad", ["T59", "TA0001", "PowerShell", ""])
+    def test_bad_technique_in_techniques_rejected(self, bad):
+        with pytest.raises(ValidationError):
+            Brief.model_validate(brief_data(techniques=["T1078", bad]))
+
     def test_missing_field_rejected(self):
         data = brief_data()
         del data["next_action"]
@@ -357,6 +364,27 @@ class TestIncident:
         with pytest.raises(ValidationError, match="timezone-aware"):
             Incident.model_validate(incident_data(**{field: "2026-10-01T09:00:00"}))
 
+    @pytest.mark.parametrize("bad", ["ALR-1", "alert-000001", "INC-0001", ""])
+    def test_bad_id_in_alert_ids_rejected(self, bad):
+        with pytest.raises(ValidationError):
+            Incident.model_validate(incident_data(alert_ids=["ALR-000003", bad]))
+
+    def test_reversed_times_rejected(self):
+        with pytest.raises(ValidationError, match="last_seen must not be before first_seen"):
+            Incident.model_validate(
+                incident_data(first_seen="2026-10-01T10:00:00Z", last_seen="2026-10-01T09:59:59Z")
+            )
+
+    def test_single_instant_allowed(self):
+        ts = "2026-10-01T09:00:00Z"
+        incident = Incident.model_validate(incident_data(first_seen=ts, last_seen=ts))
+        assert incident.first_seen == incident.last_seen
+
+    def test_timestamps_normalised_to_utc(self):
+        incident = Incident.model_validate(incident_data(first_seen="2026-10-01T14:42:04+05:30"))
+        assert incident.first_seen == datetime(2026, 10, 1, 9, 12, 4, tzinfo=UTC)
+        assert incident.first_seen.tzinfo is UTC
+
     def test_nested_models_validated(self):
         with pytest.raises(ValidationError):
             Incident.model_validate(incident_data(score=score_data(risk_score=150)))
@@ -373,6 +401,28 @@ class TestDecision:
             decision_data(opened_at="2026-10-01T15:30:00+05:30", decided_at="2026-10-01T10:01:00Z")
         )
         assert decision.triage_seconds == 60.0
+        assert decision.opened_at.tzinfo is UTC
+
+    def test_negative_triage_rejected(self):
+        with pytest.raises(ValidationError, match="decided_at must not be before opened_at"):
+            Decision.model_validate(
+                decision_data(opened_at="2026-10-01T10:00:00Z", decided_at="2026-10-01T09:59:59Z")
+            )
+
+    def test_negative_triage_across_offsets_rejected(self):
+        # 15:31+05:30 is 10:01Z, one minute after decided_at.
+        with pytest.raises(ValidationError, match="decided_at must not be before opened_at"):
+            Decision.model_validate(
+                decision_data(
+                    opened_at="2026-10-01T15:31:00+05:30", decided_at="2026-10-01T10:00:00Z"
+                )
+            )
+
+    def test_zero_triage_allowed(self):
+        ts = "2026-10-01T10:00:00Z"
+        assert (
+            Decision.model_validate(decision_data(opened_at=ts, decided_at=ts)).triage_seconds == 0
+        )
 
     def test_optional_fields_default_to_none(self):
         decision = Decision.model_validate(decision_data())

@@ -8,10 +8,18 @@ evaluation package, so the system can never peek at the answers.
 from __future__ import annotations
 
 import ipaddress
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 SCHEMA_VERSION = "1.0"
 
@@ -65,7 +73,7 @@ class ContractModel(BaseModel):
 def require_utc(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("timestamp must be timezone-aware UTC, e.g. 2026-10-01T09:00:00Z")
-    return value
+    return value.astimezone(UTC)
 
 
 def check_ip(value: str | None) -> str | None:
@@ -165,7 +173,7 @@ class ScoreBreakdown(ContractModel):
 class Brief(ContractModel):
     summary: str
     affected_assets: list[str]
-    techniques: list[str]
+    techniques: list[Annotated[str, StringConstraints(pattern=TECHNIQUE_PATTERN)]]
     timeline: list[str]
     next_action: str
     confidence: Confidence
@@ -175,7 +183,9 @@ class Brief(ContractModel):
 
 class Incident(ContractModel):
     incident_id: str = Field(pattern=INCIDENT_ID_PATTERN)
-    alert_ids: list[str] = Field(min_length=1)
+    alert_ids: list[Annotated[str, StringConstraints(pattern=ALERT_ID_PATTERN)]] = Field(
+        min_length=1
+    )
     first_seen: datetime
     last_seen: datetime
     hosts: list[str]
@@ -190,6 +200,12 @@ class Incident(ContractModel):
     @classmethod
     def _utc(cls, v: datetime) -> datetime:
         return require_utc(v)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> Incident:
+        if self.last_seen < self.first_seen:
+            raise ValueError("last_seen must not be before first_seen")
+        return self
 
 
 class Decision(ContractModel):
@@ -207,6 +223,12 @@ class Decision(ContractModel):
     @classmethod
     def _utc(cls, v: datetime) -> datetime:
         return require_utc(v)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> Decision:
+        if self.decided_at < self.opened_at:
+            raise ValueError("decided_at must not be before opened_at")
+        return self
 
     @property
     def triage_seconds(self) -> float:
