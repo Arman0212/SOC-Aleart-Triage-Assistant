@@ -124,3 +124,8 @@ def test_write_then_load_round_trips(tmp_path):
     path = tmp_path / "nested" / "dir" / "alerts.jsonl"
     write_alerts(alerts, path)
     assert load_alerts(path) == alerts
+
+    lines = [json.loads(line) for line in path.read_text().splitlines()]
+    assert all(list(line) == list(Alert.model_fields) for line in lines)
+    assert lines[0]["src_ip"] is None
+    assert lines[1]["src_ip"] == "10.0.0.1"

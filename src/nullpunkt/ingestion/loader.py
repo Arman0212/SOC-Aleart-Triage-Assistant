@@ -85,9 +85,12 @@ def load_assets(path: str | Path) -> dict[str, Asset]:
 
 
 def write_alerts(alerts: Iterable[Alert], path: str | Path) -> None:
-    """Write alerts as JSON Lines, creating parent directories as needed."""
+    """Write alerts as JSON Lines, creating parent directories as needed.
+
+    None fields are written as null so every line has the same keys.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as fh:
         for alert in alerts:
-            fh.write(alert.model_dump_json(exclude_none=True) + "\n")
+            fh.write(alert.model_dump_json() + "\n")
