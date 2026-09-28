@@ -139,6 +139,27 @@ class TestInventory:
     def test_hub_hosts_present(self, inv):
         assert set(HUB_HOSTS) <= set(inv.by_host)
 
+    @pytest.mark.parametrize(
+        ("host", "asset_type"),
+        [
+            ("JUMP01", AssetType.JUMP_HOST),
+            ("PROXY01", AssetType.PROXY),
+            ("WSUS01", AssetType.PATCH_SERVER),
+            ("SCCM01", AssetType.SOFTWARE_DISTRIBUTION),
+            ("VULNSCAN01", AssetType.VULN_SCANNER),
+            ("BACKUP01", AssetType.BACKUP_SERVER),
+            ("DC01", AssetType.DOMAIN_CONTROLLER),
+            ("FINDB01", AssetType.DATABASE),
+        ],
+    )
+    def test_infrastructure_uses_specific_asset_types(self, inv, host, asset_type):
+        assert inv.by_host[host].asset_type is asset_type
+
+    def test_only_endpoints_are_workstations_or_laptops(self, inv):
+        for asset in inv.assets:
+            endpoint = asset.host.startswith(("WS-", "LT-"))
+            assert endpoint == (asset.asset_type in (AssetType.WORKSTATION, AssetType.LAPTOP))
+
     def test_departments_needed_by_scenarios_exist_at_minimum_size(self):
         inv = build_inventory(60, random.Random(0), _faker(0))
         depts = [u.dept for u in inv.users]

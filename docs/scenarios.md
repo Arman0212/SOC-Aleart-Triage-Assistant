@@ -39,15 +39,25 @@ All timestamps on disk are UTC. The generator converts from company local time.
 
 **Inventory:**
 
-| Hosts | Criticality |
-|---|---|
-| DC01, DC02, FINDB01 | 5 |
-| HRDB01, FS01, MAIL01, VPN01, JUMP01 | 4 |
-| FS02, BACKUP01, SCCM01, PROXY01, WEB01, WEB02 | 3 |
-| WSUS01, VULNSCAN01 | 2 |
-| Finance and executive workstations | 3 |
-| Other workstations | 2 |
-| Laptops | 1 |
+| Host | Type | Criticality |
+|---|---|---|
+| DC01, DC02 | `domain_controller` | 5 |
+| FINDB01 | `database` | 5 |
+| HRDB01 | `database` | 4 |
+| FS01 | `file_server` | 4 |
+| FS02 | `file_server` | 3 |
+| MAIL01 | `mail_server` | 4 |
+| VPN01 | `vpn_gateway` | 4 |
+| JUMP01 | `jump_host` | 4 |
+| WEB01, WEB02 | `web_server` | 3 |
+| PROXY01 | `proxy` | 3 |
+| SCCM01 | `software_distribution` | 3 |
+| BACKUP01 | `backup_server` | 3 |
+| WSUS01 | `patch_server` | 2 |
+| VULNSCAN01 | `vuln_scanner` | 2 |
+| Finance and executive workstations (`WS-FIN-*`, `WS-EXE-*`) | `workstation` | 3 |
+| Other workstations (`WS-*`) | `workstation` | 2 |
+| Laptops (`LT-*`) | `laptop` | 1 |
 
 - Each named user has one primary endpoint.
 - Service accounts: `svc-backup`, `svc-sql`, `svc-deploy`, `svc-legacy` and `svc-sccm`.

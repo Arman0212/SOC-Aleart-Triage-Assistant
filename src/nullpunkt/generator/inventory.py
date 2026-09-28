@@ -24,8 +24,7 @@ HUB_HOSTS = ("DC01", "PROXY01")
 SHARED_ADMIN = "adm-it"
 SERVICE_ACCOUNTS = ("svc-backup", "svc-sql", "svc-deploy", "svc-legacy", "svc-sccm")
 
-# host, ip, type, owner, criticality. The schema has no type for jump, proxy, patch or
-# scanner hosts; they use the closest existing AssetType.
+# host, ip, type, owner, criticality
 SERVERS: tuple[tuple[str, str, AssetType, str, int], ...] = (
     ("DC01", "10.10.0.10", AssetType.DOMAIN_CONTROLLER, "it-infra", 5),
     ("DC02", "10.10.0.11", AssetType.DOMAIN_CONTROLLER, "it-infra", 5),
@@ -33,12 +32,12 @@ SERVERS: tuple[tuple[str, str, AssetType, str, int], ...] = (
     ("HRDB01", "10.10.0.21", AssetType.DATABASE, "hr", 4),
     ("FS01", "10.10.0.30", AssetType.FILE_SERVER, "it-infra", 4),
     ("FS02", "10.10.0.31", AssetType.FILE_SERVER, "it-infra", 3),
-    ("BACKUP01", "10.10.0.40", AssetType.FILE_SERVER, "it-infra", 3),
-    ("JUMP01", "10.10.0.50", AssetType.WORKSTATION, "it-infra", 4),
-    ("SCCM01", "10.10.0.60", AssetType.WEB_SERVER, "it-infra", 3),
-    ("WSUS01", "10.10.0.61", AssetType.WEB_SERVER, "it-infra", 2),
-    ("PROXY01", "10.10.0.70", AssetType.WEB_SERVER, "it-infra", 3),
-    ("VULNSCAN01", "10.10.0.80", AssetType.WORKSTATION, "secops", 2),
+    ("BACKUP01", "10.10.0.40", AssetType.BACKUP_SERVER, "it-infra", 3),
+    ("JUMP01", "10.10.0.50", AssetType.JUMP_HOST, "it-infra", 4),
+    ("SCCM01", "10.10.0.60", AssetType.SOFTWARE_DISTRIBUTION, "it-infra", 3),
+    ("WSUS01", "10.10.0.61", AssetType.PATCH_SERVER, "it-infra", 2),
+    ("PROXY01", "10.10.0.70", AssetType.PROXY, "it-infra", 3),
+    ("VULNSCAN01", "10.10.0.80", AssetType.VULN_SCANNER, "secops", 2),
     ("VPN01", "10.20.0.5", AssetType.VPN_GATEWAY, "it-infra", 4),
     ("WEB01", "10.20.0.10", AssetType.WEB_SERVER, "web-team", 3),
     ("WEB02", "10.20.0.11", AssetType.WEB_SERVER, "web-team", 3),

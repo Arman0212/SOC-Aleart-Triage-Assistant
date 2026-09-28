@@ -75,7 +75,7 @@ GOLDEN_FAKER = "40.39.0"
 GOLDEN_SHA256 = {
     "alerts.jsonl": "e19e69f97858bb502f4a3862dcd08f9bfd54ddf2c2fa6883dfd0ccc95032eaeb",
     "labels.csv": "418924a43d0a8deb2df1275404fc87467dae1594a8287cdbf30b8a24e326ec9e",
-    "assets.csv": "b1961ae32a520313e463a14c38d0b9848cdce335ec5ca927ad1e1db5c3666a67",
+    "assets.csv": "8fadc659268810f89674fa984fb1b4fe46f40d83d0ab0ea6fe29f40165ff4262",
 }
 
 
