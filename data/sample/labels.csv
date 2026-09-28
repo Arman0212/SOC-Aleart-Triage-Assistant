@@ -1,0 +1,15 @@
+alert_id,scenario_id,is_true_positive,true_technique
+ALR-000001,,false,
+ALR-000002,,false,
+ALR-000003,SCN-01,true,T1566.001
+ALR-000004,,false,
+ALR-000005,SCN-01,true,T1059.001
+ALR-000006,,false,
+ALR-000007,,false,
+ALR-000008,SCN-01,true,T1078
+ALR-000009,,false,
+ALR-000010,SCN-01,true,T1021.002
+ALR-000011,,false,
+ALR-000012,SCN-01,true,T1005
+ALR-000013,,false,
+ALR-000014,,false,

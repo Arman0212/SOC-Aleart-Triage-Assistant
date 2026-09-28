@@ -1,0 +1,10 @@
+host,ip,asset_type,owner,criticality
+DC01,10.0.0.10,domain_controller,it-infra,5
+FINDB01,10.0.1.20,database,finance,5
+MAIL01,10.0.0.25,mail_server,it-infra,4
+VPN01,10.0.0.5,vpn_gateway,it-infra,4
+FS01,10.0.1.30,file_server,it-infra,3
+WEB01,10.0.2.10,web_server,marketing,3
+WS-FIN-12,10.0.3.12,workstation,j.meyer,2
+LT-SALES-04,10.0.4.4,laptop,t.becker,1
+LT-MKT-09,10.0.4.9,laptop,l.wagner,1
