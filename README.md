@@ -94,6 +94,19 @@ python -m nullpunkt.correlation --batch data/generated/batch-001
 On the seed-42 demo shift, 3,000 alerts become 65 incidents and every injected intrusion lands
 whole in a single incident. See [docs/correlation_tuning.md](docs/correlation_tuning.md).
 
+```bash
+# the full pipeline: correlate, map to ATT&CK, score and rank (top 10 with P1-P4 tiers)
+python -m nullpunkt.pipeline --batch data/generated/batch-001
+```
+
+| Seed-42 scenario rank | Our score | Severity-only | Alert count |
+|---|---|---|---|
+| SCN-01 phishing → finance DB (low/medium alerts only) | **1** | 51 | 52 |
+| Mean over all 7 scenarios | **4.0** | 39.9 | 44.9 |
+| Scenarios in the top 10 | **7** | 0 | 0 |
+
+See [docs/scoring_evaluation.md](docs/scoring_evaluation.md).
+
 Load the sample batch:
 
 ```python
@@ -105,18 +118,19 @@ assets = load_assets("data/sample/assets.csv")  # 9 hosts keyed by name
 
 ## Project status
 
-Phases 0 (foundation), 1 (synthetic data generator) and 2 (correlation) are done. The later
-phases are listed in the project plan.
+Phases 0–4 are done: foundation, synthetic data generator, correlation, ATT&CK mapping, and risk
+scoring. The later phases are listed in the project plan.
 
 | Component | Status |
 |---|---|
 | Data contract, loaders, sample batch, tests, CI, docs | done |
 | Synthetic data generator (80 hosts, 3,000 alerts, 7 scenarios) | done |
 | Correlation (3,000 alerts → 65 incidents, all scenarios whole) | done |
-| ATT&CK mapping | not started |
-| Scoring (formula lands in Phase 3) | not started |
+| ATT&CK mapping (Enterprise ATT&CK v19.2) | done |
+| Risk scoring and P1–P4 tiers (all 7 scenarios in the top 10) | done |
 | Phi briefs, SQLite storage, Streamlit app | not started |
-| Evaluation: detection metrics, MTTT before vs after | not started |
+| Evaluation: correlation and ranking metrics, baselines | done |
+| Evaluation: MTTT before vs after | not started |
 | Azure deployment (Phase 8) | not started |
 
 ## Contributing

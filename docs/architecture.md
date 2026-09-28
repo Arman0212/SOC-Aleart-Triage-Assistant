@@ -4,12 +4,12 @@ Nullpunkt turns a shift's worth of alerts (about 3,000) into about 60 ranked inc
 MITRE ATT&CK techniques, an explainable risk score and a short brief that an analyst approves.
 Types are defined in [data_contract.md](data_contract.md).
 
-> **Status: Phase 2.**
+> **Status: Phases 3–4.**
 >
 > - **Built:** the contract, loaders, sample batch and tests, the synthetic data generator
->   ([scenarios.md](scenarios.md)), and stages 1–2 (ingestion and
->   [correlation](#correlation)).
-> - **Designed only:** stages 3–5.
+>   ([scenarios.md](scenarios.md)), stages 1–4 (ingestion, [correlation](#correlation), ATT&CK
+>   mapping and [risk scoring](#ranking)), and the pipeline orchestrator (`nullpunkt.pipeline`).
+> - **Designed only:** stage 5 (briefing), storage and the review app.
 
 ## Pipeline
 
@@ -145,7 +145,20 @@ finance database. `ScoreBreakdown` therefore combines:
 - `noise_penalty`, for rules that fire often and are usually benign
 
 It stores each component next to the final `risk_score` so the ranking can be explained. The exact
-formula is owned by `scoring` and is not fixed yet (Phase 3).
+formula, tuning and evaluation are in [scoring_evaluation.md](scoring_evaluation.md):
+
+> risk = 100 × (S × C / 20) × (M / M_max) × N
+
+- **S × C:** the peak severity × criticality of one alert-on-asset. Each rule says whether it
+  threatens the host or the source, and relay infrastructure (DC, proxy, mail gateway, VPN)
+  never lends its criticality.
+- **M:** the stage multiplier, from distinct ATT&CK tactics.
+- **N:** the noise penalty, from rule informativeness and routine `(rule, actor)` pairs.
+
+Each incident also gets a priority tier, P1–P4, from fixed score thresholds.
+
+On the held-out seed-42 batch, all 7 scenarios rank in the top 7, against ranks 32–51 under
+severity-only ordering.
 
 The sample batch's scenario SCN-01 is built to prove this. Its alerts are all LOW or MEDIUM and
 end on FINDB01 (criticality 5), while the loudest alerts in the batch are HIGH or CRITICAL false

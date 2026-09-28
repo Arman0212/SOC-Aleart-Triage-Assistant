@@ -157,7 +157,8 @@ Every score carries its components so an analyst can see why an incident ranks w
 | `explanation` | str | required | plain-language reason for the score |
 
 The schema only checks each field's range. It does not check that `risk_score` is consistent with
-the other components. The formula belongs to `nullpunkt.scoring` and is not fixed yet (Phase 3).
+the other components. The formula belongs to `nullpunkt.scoring`; see
+[scoring_evaluation.md](scoring_evaluation.md).
 
 ### Brief
 
