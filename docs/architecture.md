@@ -83,16 +83,16 @@ behind them are in [correlation_tuning.md](correlation_tuning.md).
    - **Host:** *local* when nobody else acted on it, and a *target* when someone did.
    - **External destinations** (C2, exfiltration) count as active.
 3. **Hubs**, detected from the batch. An entity is a hub if it:
-   - is in ≥ 6 % of alerts,
-   - co-occurs with ≥ 4 distinct users,
-   - as an actor, acts on ≥ 4 distinct hosts, or
+   - is in ≥ 8 % of alerts,
+   - co-occurs with ≥ 6 distinct users,
+   - as an actor, acts on ≥ 6 distinct hosts, or
    - is an inventory asset of a known busy type (domain controller, proxy, vulnerability
      scanner, backup server, software distribution) and appears in ≥ 1 % of alerts.
 
    Hubs never create links on their own; an alert on a hub joins an incident through its other
    entities.
 4. **Linking by per-entity time chaining.** Each alert links to the previous alert sharing a
-   non-hub entity within 120 minutes. The alerts are processed in time order, so the pass is
+   non-hub entity within 150 minutes. The alerts are processed in time order, so the pass is
    linear after sorting. Rules:
    - Active occurrences link to each other.
    - A target links only to activity on that host (exploit, then a shell), never to another

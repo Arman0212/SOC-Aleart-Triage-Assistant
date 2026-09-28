@@ -105,7 +105,7 @@ pytest                       # all tests
 pytest tests/unit            # unit tests only
 python -m nullpunkt.generator --out data/generated/batch-001   # generate a 3,000-alert shift
 python -m nullpunkt.correlation --batch data/generated/batch-001   # correlate it into incidents
-python -m nullpunkt.evaluation.sweep_correlation   # re-tune correlation (~100 s)
+python -m nullpunkt.evaluation.sweep_correlation   # re-tune correlation (~4-5 min)
 ruff check .                 # lint
 ruff format .                # format (CI runs `ruff format --check .`)
 ```
