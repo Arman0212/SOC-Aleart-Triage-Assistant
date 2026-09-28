@@ -13,7 +13,8 @@ Nullpunkt is a SOC alert-triage tool built for Microsoft Innovate 2026, Problem 
 - measures mean time to triage (MTTT) before and after
 
 **Stack (fixed, do not add to it without asking):** Python, pandas, networkx, Streamlit, SQLite,
-Phi via Ollama, Azure. Runtime and dev dependencies are listed in `pyproject.toml`; use only those.
+Phi via Ollama, Azure (deployment target; details in Phase 8). Runtime and dev dependencies are
+listed in `pyproject.toml`; use only those.
 
 **Status:** Phase 0 (foundation) is done: the data contract, loaders, sample batch, tests, CI and
 docs. The pipeline packages are still empty.
@@ -50,15 +51,20 @@ positives on criticality-1 laptops.
 
 ## Hard rules
 
-1. **Do not modify `src/nullpunkt/core/schema.py`.** If it seems to need a change, stop and explain
+1. **Never run a git command that changes state.** That means no `add`, `commit`, `push`,
+   `rebase`, `reset`, `stash`, `checkout` (or `merge`, `pull`, `restore`, `switch`, `tag`, etc.).
+   Read-only git (`status`, `diff`, `log`, `show`) is fine. Write code, run the checks, leave the
+   changes uncommitted, and propose a commit plan; the user commits.
+2. **Do not modify `src/nullpunkt/core/schema.py`.** If it seems to need a change, stop and explain
    why to the user. Schema changes need team approval.
-2. **Ground truth never leaves `nullpunkt.evaluation`.** Pipeline code sees only `Alert` and
+3. **Ground truth never leaves `nullpunkt.evaluation`.** Pipeline code sees only `Alert` and
    `Asset`, and never imports `GroundTruth` or `nullpunkt.evaluation` or reads `labels.csv`.
    `tests/unit/test_ground_truth.py` enforces this.
-3. **All timestamps are timezone-aware UTC.** Write them as `...Z`, and use
-   `datetime.now(UTC)`, never `datetime.now()` or `utcnow()`.
-4. **Support Python >= 3.11.** Local development uses 3.14; CI runs 3.11 and 3.12.
-5. **Use only the dependencies already in `pyproject.toml`.**
+4. **All timestamps are timezone-aware UTC.** Write them as `...Z`, and use
+   `datetime.now(UTC)`, never `datetime.now()` or `utcnow()`. The schema rejects naive datetimes
+   and converts aware ones to UTC.
+5. **Support Python >= 3.11.** Local development uses 3.14; CI runs 3.11 and 3.12.
+6. **Use only the dependencies already in `pyproject.toml`.**
 
 ## Commands
 
