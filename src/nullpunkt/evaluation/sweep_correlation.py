@@ -10,8 +10,14 @@ Selection order (lexicographic):
      at most 10 %;
   3. highest worst-case purity, excluding SCN-05 (impure by design);
   4. incident count inside 50-75 on every seed, if any setting achieves it;
-  5. mean incident count closest to 60;
-  6. smallest largest incident; then the order of the grid (deterministic).
+  5. robustness: every neighbouring grid point (one parameter moved one step) keeps every
+     scenario complete on every tuning seed; then the most such neighbours;
+  6. mean incident count closest to 60;
+  7. smallest largest incident;
+  8. the order of the grid (deterministic).
+
+Robustness comes before closeness to 60 because the incident count falls steadily as the window
+grows, so "closest to 60" on its own always drifts to the longest window in the grid.
 """
 
 from __future__ import annotations
@@ -20,12 +26,12 @@ import argparse
 import itertools
 import statistics
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from nullpunkt.core.config import CorrelationConfig
 from nullpunkt.core.schema import Alert, Asset, GroundTruth
-from nullpunkt.correlation.engine import correlate
+from nullpunkt.correlation.engine import correlate, entity_stats
 from nullpunkt.evaluation.metrics import (
     LARGE_INCIDENT_SHARE,
     CorrelationMetrics,
@@ -43,9 +49,9 @@ TARGET_COUNT = 60
 BY_DESIGN_IMPURE = {"SCN-05"}
 
 GRID: dict[str, list] = {
-    "window_minutes": [30, 45, 60, 90, 120],
-    "hub_min_share": [0.04, 0.06, 0.08],
-    "hub_min_users": [3, 4, 6],
+    "window_minutes": [30, 45, 60, 90, 120, 150, 180],
+    "hub_min_share": [0.04, 0.06, 0.08, 0.10],
+    "hub_min_users": [3, 4, 6, 8],
     "hub_min_fanout": [4, 6, 8],
     "recurrence_max_gap_minutes": [None, 120, 240],
     "hub_actor_routine": [True, False],
@@ -80,6 +86,12 @@ class Evaluation:
 class Candidate:
     params: dict
     runs: tuple[Evaluation, ...]
+    complete_neighbours: int = 0
+    neighbours: int = 0
+
+    @property
+    def complete(self) -> bool:
+        return min(r.min_completeness for r in self.runs) == 1.0
 
     @property
     def counts(self) -> list[int]:
@@ -94,6 +106,8 @@ class Candidate:
             not all(r.oversized_ok for r in self.runs),
             -min(r.min_purity for r in self.runs),
             not in_range,
+            self.complete_neighbours < self.neighbours,
+            -self.complete_neighbours,
             abs(statistics.mean(counts) - TARGET_COUNT),
             max(r.metrics.largest_share for r in self.runs),
         )
@@ -117,14 +131,58 @@ def evaluate(batch: Batch, config: CorrelationConfig) -> Evaluation:
     return Evaluation(metrics, oversized_ok)
 
 
+def grid_neighbours(params: dict, grid: dict[str, list] = GRID) -> list[dict]:
+    """Settings that differ from ``params`` in one parameter by one grid step."""
+    out = []
+    for key, values in grid.items():
+        i = values.index(params[key])
+        for j in (i - 1, i + 1):
+            if 0 <= j < len(values):
+                out.append({**params, key: values[j]})
+    return out
+
+
+def _key(params: dict) -> tuple:
+    return tuple(sorted(params.items(), key=lambda kv: kv[0]))
+
+
 def sweep(batches: list[Batch], grid: dict[str, list] = GRID) -> list[Candidate]:
     candidates = []
     for values in itertools.product(*grid.values()):
         params = dict(zip(grid, values, strict=True))
         config = CorrelationConfig(**params)
         candidates.append(Candidate(params, tuple(evaluate(b, config) for b in batches)))
+    complete = {_key(c.params): c.complete for c in candidates}
+    scored = []
+    for c in candidates:
+        near = [complete[_key(n)] for n in grid_neighbours(c.params, grid)]
+        scored.append(replace(c, complete_neighbours=sum(near), neighbours=len(near)))
     # sorted() is stable, so equal keys keep grid order.
-    return sorted(candidates, key=lambda c: c.sort_key)
+    return sorted(scored, key=lambda c: c.sort_key)
+
+
+MARGIN_ENTITIES = ("host:WEB02",)
+
+
+def margin_lines(
+    batches: list[Batch], config: CorrelationConfig, entities: tuple[str, ...] = MARGIN_ENTITIES
+) -> list[str]:
+    """How far each entity is from becoming a hub under ``config``, per batch."""
+    lines = [
+        "| entity | seed | alerts | share (hub at) | users (hub at) | fan-out (hub at) | hub? |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for entity in entities:
+        for batch in batches:
+            s = entity_stats(batch.alerts, batch.assets, config)[entity]
+            lines.append(
+                f"| {entity} | {batch.seed} | {s.alerts} "
+                f"| {s.share:.1%} ({config.hub_min_share:.0%}) "
+                f"| {s.distinct_users} ({config.hub_min_users}) "
+                f"| {s.fanout} ({config.hub_min_fanout}) "
+                f"| {'yes: ' + '; '.join(s.reasons) if s.reasons else 'no'} |"
+            )
+    return lines
 
 
 def _fmt_params(p: dict) -> str:
@@ -136,11 +194,14 @@ def _fmt_params(p: dict) -> str:
     )
 
 
-def markdown(ranked: list[Candidate], held_out: Evaluation, top: int = 15) -> str:
+def markdown(
+    ranked: list[Candidate], held_out: Evaluation, top: int = 15, margins: list[str] | None = None
+) -> str:
     lines = [
         "| # | window (min) | hub share | hub users | hub fan-out | recurrence gap | routine "
-        "| min completeness | min purity* | incidents (101-105) | largest | oversized OK |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "| min completeness | min purity* | incidents (101-105) | largest | oversized OK "
+        "| complete neighbours |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for rank, c in enumerate(ranked[:top], start=1):
         lines.append(
@@ -149,7 +210,8 @@ def markdown(ranked: list[Candidate], held_out: Evaluation, top: int = 15) -> st
             f"| {min(r.min_purity for r in c.runs):.2f} "
             f"| {min(c.counts)}-{max(c.counts)} "
             f"| {max(r.metrics.largest_share for r in c.runs):.1%} "
-            f"| {'yes' if all(r.oversized_ok for r in c.runs) else 'no'} |"
+            f"| {'yes' if all(r.oversized_ok for r in c.runs) else 'no'} "
+            f"| {c.complete_neighbours}/{c.neighbours} |"
         )
     lines.append("")
     lines.append("\\* excluding SCN-05, which shares its user with password-typo noise by design.")
@@ -170,6 +232,8 @@ def markdown(ranked: list[Candidate], held_out: Evaluation, top: int = 15) -> st
         f"incident), largest {m.largest_incident} ({m.largest_share:.1%}), oversized incidents "
         f"single-activity: {'yes' if held_out.oversized_ok else 'no'}."
     )
+    if margins:
+        lines += ["", "Hub-threshold margins with the chosen settings:", "", *margins]
     return "\n".join(lines) + "\n"
 
 
@@ -182,8 +246,11 @@ def main(argv: list[str] | None = None) -> int:
     batches = [make_batch(seed) for seed in TUNING_SEEDS]
     ranked = sweep(batches)
     best = ranked[0]
-    held_out = evaluate(make_batch(HELD_OUT_SEED), CorrelationConfig(**best.params))
-    text = markdown(ranked, held_out, args.top)
+    chosen = CorrelationConfig(**best.params)
+    held_out_batch = make_batch(HELD_OUT_SEED)
+    held_out = evaluate(held_out_batch, chosen)
+    margins = margin_lines([held_out_batch, *batches], chosen)
+    text = markdown(ranked, held_out, args.top, margins)
     print(f"{len(ranked)} settings evaluated on seeds {', '.join(map(str, TUNING_SEEDS))}.")
     print(f"Chosen: {best.params}\n")
     print(text)
