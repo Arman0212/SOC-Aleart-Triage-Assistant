@@ -84,6 +84,33 @@ def load_assets(path: str | Path) -> dict[str, Asset]:
     return assets
 
 
+def write_csv_models(models: Iterable[ContractModel], model: type[M], path: str | Path) -> None:
+    """Write models as CSV with one column per field: None as an empty cell, bools as
+    true/false. Uses \\n line endings so output is byte-identical on every OS."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fields = list(model.model_fields)
+    with path.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh, lineterminator="\n")
+        writer.writerow(fields)
+        for item in models:
+            row = item.model_dump(mode="json")
+            writer.writerow([_csv_cell(row[f]) for f in fields])
+
+
+def _csv_cell(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def write_assets(assets: Iterable[Asset], path: str | Path) -> None:
+    """Write assets.csv in the format ``load_assets`` reads."""
+    write_csv_models(assets, Asset, path)
+
+
 def write_alerts(alerts: Iterable[Alert], path: str | Path) -> None:
     """Write alerts as JSON Lines, creating parent directories as needed.
 

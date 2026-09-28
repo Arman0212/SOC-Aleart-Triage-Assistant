@@ -3,7 +3,13 @@ import json
 import pytest
 
 from nullpunkt.core.schema import Alert
-from nullpunkt.ingestion.loader import DataFileError, load_alerts, load_assets, write_alerts
+from nullpunkt.ingestion.loader import (
+    DataFileError,
+    load_alerts,
+    load_assets,
+    write_alerts,
+    write_assets,
+)
 
 
 def alert_line(alert_id: str, timestamp: str, **extra) -> str:
@@ -129,3 +135,11 @@ def test_write_then_load_round_trips(tmp_path):
     assert all(list(line) == list(Alert.model_fields) for line in lines)
     assert lines[0]["src_ip"] is None
     assert lines[1]["src_ip"] == "10.0.0.1"
+
+
+def test_write_assets_round_trips_byte_for_byte(sample_dir, tmp_path):
+    assets = load_assets(sample_dir / "assets.csv")
+    path = tmp_path / "out" / "assets.csv"
+    write_assets(assets.values(), path)
+    assert load_assets(path) == assets
+    assert path.read_bytes() == (sample_dir / "assets.csv").read_bytes()
