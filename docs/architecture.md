@@ -4,9 +4,12 @@ Nullpunkt turns a shift's worth of alerts (about 3,000) into about 60 ranked inc
 MITRE ATT&CK techniques, an explainable risk score and a short brief that an analyst approves.
 Types are defined in [data_contract.md](data_contract.md).
 
-> Status: Phase 1. The contract, loaders, sample batch, tests and the synthetic data generator
-> ([scenarios.md](scenarios.md)) exist. Stages 1–5 below are the design; their packages are
-> still empty.
+> **Status: Phase 2.**
+>
+> - **Built:** the contract, loaders, sample batch and tests, the synthetic data generator
+>   ([scenarios.md](scenarios.md)), and stages 1–2 (ingestion and
+>   [correlation](#correlation)).
+> - **Designed only:** stages 3–5.
 
 ## Pipeline
 
@@ -54,10 +57,68 @@ evaluation compares pipeline output and analyst decisions against the labels.
 
 Shared types and constants live in `core`.
 
-Correlation groups alerts into incidents using a networkx graph whose nodes are alerts and whose
-edges are shared entities such as a host, user or IP. Mapping runs before ranking because the
-score's `stage_multiplier` depends on where the techniques sit in the kill chain. The deck presents
-Rank before Map as the narrative order, but execution maps first because scoring uses tactics.
+Mapping runs before ranking because the score's `stage_multiplier` depends on where the
+techniques sit in the kill chain. The deck presents Rank before Map as the narrative order, but
+execution maps first because scoring uses tactics.
+
+## Correlation
+
+`nullpunkt.correlation.correlate(alerts, assets, config)` returns incidents with `alert_ids`,
+`first_seen`, `last_seen`, `hosts`, `users` and `ips` filled in. `run_correlation` also returns
+a `CorrelationResult`:
+
+- **Link reasons:** the links that built each incident, for example "same user jill.rhodes,
+  12 min apart".
+- **Hubs:** the detected hubs, with their statistics.
+
+Settings live in `configs/pipeline.yaml` under `correlation:`. The tuned values and the reasoning
+behind them are in [correlation_tuning.md](correlation_tuning.md).
+
+1. **Entities.** Each alert has a host, a user, and source/destination IPs.
+   - IPs that belong to an inventory asset become that host, so "login on FINDB01 from
+     10.30.0.7" links to WS-FIN-03.
+   - Addresses outside `internal_networks` are external.
+2. **Roles.**
+   - **Actors:** the user and the source.
+   - **Host:** *local* when nobody else acted on it, and a *target* when someone did.
+   - **External destinations** (C2, exfiltration) count as active.
+3. **Hubs**, detected from the batch. An entity is a hub if it:
+   - is in ≥ 6 % of alerts,
+   - co-occurs with ≥ 4 distinct users,
+   - as an actor, acts on ≥ 4 distinct hosts, or
+   - is an inventory asset of a known busy type (domain controller, proxy, vulnerability
+     scanner, backup server, software distribution) and appears in ≥ 1 % of alerts.
+
+   Hubs never create links on their own; an alert on a hub joins an incident through its other
+   entities.
+4. **Linking by per-entity time chaining.** Each alert links to the previous alert sharing a
+   non-hub entity within 120 minutes. The alerts are processed in time order, so the pass is
+   linear after sorting. Rules:
+   - Active occurrences link to each other.
+   - A target links only to activity on that host (exploit, then a shell), never to another
+     target.
+   - Scan rules (ATT&CK T1595\*, T1046) never link through the host they probed.
+   - Inbound non-scan alerts do not link through their rotating external source.
+   - A host links only if the alert has a non-hub actor, or no actor at all.
+5. **Recurrence.** The same rule on the same key entity is linked across the whole shift, as long
+   as the group involves at most one user.
+   - **Key:** the user or source, or the target host for inbound noise.
+   - **Covered cases:** typo bursts, scanner waves, and IDS noise against one server.
+   - **Protected cases:** DC01 and shared VPN exit IPs, which serve many users, never merge people.
+6. **Hub routines.** With `hub_actor_routine`, all single-user activity of a fan-out hub account
+   becomes one routine incident.
+7. **Components become incidents.** A union-find computes the connected components, and incidents
+   are numbered `INC-0001…` by first alert. Every successful union is kept as a `Link`, so each
+   incident carries exactly the spanning set of reasons that built it.
+
+**Known limitation.** A compromised *shared* hub account (for example `adm-it` or a service
+account) would be absorbed into that account's routine incident instead of standing out. Our
+scenarios deliberately use a personal admin account (SCN-06). Per-account behavioural baselines
+are future work; see [correlation_tuning.md](correlation_tuning.md#known-limitation-hub-routines-absorb-a-compromised-hub-account).
+
+```bash
+python -m nullpunkt.correlation --batch data/generated/batch-001   # incidents, sizes, hubs
+```
 
 ## How an Incident is enriched
 

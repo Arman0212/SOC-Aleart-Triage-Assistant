@@ -86,6 +86,14 @@ python -m nullpunkt.generator --config configs/generator.yaml --seed 42 --out da
 The generated shift has 80 hosts and 7 injected intrusions hidden in clustered noise. See
 [docs/scenarios.md](docs/scenarios.md).
 
+```bash
+# correlate the shift into incidents (reads only alerts.jsonl and assets.csv)
+python -m nullpunkt.correlation --batch data/generated/batch-001
+```
+
+On the seed-42 demo shift, 3,000 alerts become 68 incidents and every injected intrusion lands
+whole in a single incident. See [docs/correlation_tuning.md](docs/correlation_tuning.md).
+
 Load the sample batch:
 
 ```python
@@ -97,14 +105,15 @@ assets = load_assets("data/sample/assets.csv")  # 9 hosts keyed by name
 
 ## Project status
 
-Phases 0 (foundation) and 1 (synthetic data generator) are done. The later phases are listed in
-the project plan.
+Phases 0 (foundation), 1 (synthetic data generator) and 2 (correlation) are done. The later
+phases are listed in the project plan.
 
 | Component | Status |
 |---|---|
 | Data contract, loaders, sample batch, tests, CI, docs | done |
 | Synthetic data generator (80 hosts, 3,000 alerts, 7 scenarios) | done |
-| Correlation, ATT&CK mapping | not started |
+| Correlation (3,000 alerts → 68 incidents, all scenarios whole) | done |
+| ATT&CK mapping | not started |
 | Scoring (formula lands in Phase 3) | not started |
 | Phi briefs, SQLite storage, Streamlit app | not started |
 | Evaluation: detection metrics, MTTT before vs after | not started |
