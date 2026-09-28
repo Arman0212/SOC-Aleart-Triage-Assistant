@@ -60,6 +60,12 @@ class AssetType(StrEnum):
     MAIL_SERVER = "mail_server"
     VPN_GATEWAY = "vpn_gateway"
     WEB_SERVER = "web_server"
+    JUMP_HOST = "jump_host"
+    PROXY = "proxy"
+    PATCH_SERVER = "patch_server"
+    SOFTWARE_DISTRIBUTION = "software_distribution"
+    VULN_SCANNER = "vuln_scanner"
+    BACKUP_SERVER = "backup_server"
     WORKSTATION = "workstation"
     LAPTOP = "laptop"
 

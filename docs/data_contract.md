@@ -89,7 +89,7 @@ One alert as the SOC sees it. It never contains ground truth.
 |---|---|---|---|
 | `host` | str | yes | non-empty, unique |
 | `ip` | str | yes | valid IP |
-| `asset_type` | `AssetType` | yes | `domain_controller`, `database`, `file_server`, `mail_server`, `vpn_gateway`, `web_server`, `workstation`, `laptop` |
+| `asset_type` | `AssetType` | yes | servers: `domain_controller`, `database`, `file_server`, `mail_server`, `vpn_gateway`, `web_server`; infrastructure: `jump_host`, `proxy`, `patch_server`, `software_distribution`, `vuln_scanner`, `backup_server`; endpoints: `workstation`, `laptop` |
 | `owner` | str | yes | |
 | `criticality` | int | yes | 1 (least) to 5 (crown jewels) |
 

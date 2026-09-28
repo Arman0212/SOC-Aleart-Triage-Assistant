@@ -141,6 +141,39 @@ class TestAsset:
         with pytest.raises(ValidationError):
             Asset.model_validate(asset_data(ip="999.1.1.1"))
 
+    @pytest.mark.parametrize(
+        "asset_type",
+        [
+            "jump_host",
+            "proxy",
+            "patch_server",
+            "software_distribution",
+            "vuln_scanner",
+            "backup_server",
+        ],
+    )
+    def test_infrastructure_asset_types_accepted(self, asset_type):
+        asset = Asset.model_validate(asset_data(asset_type=asset_type))
+        assert asset.asset_type == asset_type
+
+    def test_asset_type_values(self):
+        assert {t.value for t in AssetType} == {
+            "domain_controller",
+            "database",
+            "file_server",
+            "mail_server",
+            "vpn_gateway",
+            "web_server",
+            "jump_host",
+            "proxy",
+            "patch_server",
+            "software_distribution",
+            "vuln_scanner",
+            "backup_server",
+            "workstation",
+            "laptop",
+        }
+
     def test_unknown_asset_type_rejected(self):
         with pytest.raises(ValidationError):
             Asset.model_validate(asset_data(asset_type="printer"))
