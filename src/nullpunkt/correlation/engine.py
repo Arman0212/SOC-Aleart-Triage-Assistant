@@ -108,9 +108,10 @@ def _entities(alerts: list[Alert], assets: dict[str, Asset], cfg: CorrelationCon
     return rows
 
 
-def detect_hubs(
+def _entity_stats(
     rows: list[_Row], assets: dict[str, Asset], cfg: CorrelationConfig
 ) -> list[HubStat]:
+    """Statistics for every entity; ``reasons`` is empty for entities that are not hubs."""
     n = len(rows)
     count: Counter[str] = Counter()
     users_of: dict[str, set[str]] = defaultdict(set)
@@ -125,7 +126,7 @@ def detect_hubs(
             fanout_of[actor].add(r.host)
 
     hints = set(cfg.hub_hint_types)
-    hubs = []
+    stats = []
     for entity in sorted(count):
         share = count[entity] / n
         kind, value = split_entity(entity)
@@ -143,18 +144,32 @@ def detect_hubs(
             and share >= cfg.hub_hint_min_share
         ):
             reasons.append(f"{assets[value].asset_type.value} in inventory")
-        if reasons:
-            hubs.append(
-                HubStat(
-                    entity=entity,
-                    alerts=count[entity],
-                    share=share,
-                    distinct_users=len(users_of[entity]),
-                    fanout=len(fanout_of[entity]),
-                    reasons=tuple(reasons),
-                )
+        stats.append(
+            HubStat(
+                entity=entity,
+                alerts=count[entity],
+                share=share,
+                distinct_users=len(users_of[entity]),
+                fanout=len(fanout_of[entity]),
+                reasons=tuple(reasons),
             )
-    return hubs
+        )
+    return stats
+
+
+def detect_hubs(
+    rows: list[_Row], assets: dict[str, Asset], cfg: CorrelationConfig
+) -> list[HubStat]:
+    return [s for s in _entity_stats(rows, assets, cfg) if s.reasons]
+
+
+def entity_stats(
+    alerts: list[Alert], assets: dict[str, Asset], config: CorrelationConfig | None = None
+) -> dict[str, HubStat]:
+    """Hub statistics for every entity in the batch, hub or not (for margin reporting)."""
+    cfg = config or CorrelationConfig()
+    rows = _entities(alerts, assets, cfg)
+    return {s.entity: s for s in _entity_stats(rows, assets, cfg)}
 
 
 def run_correlation(

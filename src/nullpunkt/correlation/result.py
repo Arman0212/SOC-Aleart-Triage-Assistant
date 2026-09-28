@@ -53,6 +53,8 @@ class Link:
 
 @dataclass(frozen=True)
 class HubStat:
+    """Hub statistics for one entity. ``reasons`` lists why it is a hub (empty if it is not)."""
+
     entity: str
     alerts: int
     share: float
