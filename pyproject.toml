@@ -16,10 +16,13 @@ dependencies = [
     "pyyaml>=6.0",
     "pandas>=2.2",
     "networkx>=3.3",
-    "faker>=30.0",
+    "faker>=40.0,<41",
     "streamlit>=1.40",
     "ollama>=0.4",
 ]
+
+[project.scripts]
+nullpunkt-generate = "nullpunkt.generator.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.16", "pre-commit>=3.8"]

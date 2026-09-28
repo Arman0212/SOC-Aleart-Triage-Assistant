@@ -1,0 +1,11 @@
+# Synthetic SOC shift. shift_start and business hours are local time in company_timezone;
+# everything written to disk is UTC.
+seed: 42
+n_hosts: 80
+n_alerts: 3000
+company_timezone: Asia/Kolkata
+shift_start: "2026-10-01T09:00:00"   # 09:00 IST = 03:30 UTC
+shift_hours: 12                      # until 21:00 IST
+business_start: "09:00"
+business_end: "18:00"
+scenarios: [SCN-01, SCN-02, SCN-03, SCN-04, SCN-05, SCN-06, SCN-07]

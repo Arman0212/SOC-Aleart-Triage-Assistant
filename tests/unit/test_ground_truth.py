@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 import nullpunkt
-from nullpunkt.evaluation.ground_truth import load_ground_truth
+from nullpunkt.evaluation.ground_truth import load_ground_truth, write_ground_truth
 from nullpunkt.ingestion.loader import DataFileError
 
 HEADER = "alert_id,scenario_id,is_true_positive,true_technique"
@@ -43,8 +43,12 @@ def test_duplicate_alert_id_rejected(tmp_path):
 
 
 PACKAGE_ROOT = Path(nullpunkt.__file__).parent
-# core defines GroundTruth; evaluation is the only package allowed to use it.
-ALLOWED = {"core", "evaluation"}
+# core defines GroundTruth, evaluation reads labels, and the generator (offline tooling) writes
+# them. Everything else is pipeline or app code and sees only Alert and Asset.
+LABEL_ACCESS = {"core", "evaluation", "generator"}
+# Scenario definitions are truth too, so only evaluation may look at the generator.
+GENERATOR_ACCESS = {"generator", "evaluation"}
+TRUTH_FILES = ("labels.csv", "manifest.json")
 
 
 def imported_names(path: Path) -> set[str]:
@@ -58,14 +62,43 @@ def imported_names(path: Path) -> set[str]:
     return names
 
 
-@pytest.mark.parametrize(
-    "path",
-    [p for p in PACKAGE_ROOT.rglob("*.py") if p.relative_to(PACKAGE_ROOT).parts[0] not in ALLOWED],
-    ids=lambda p: str(p.relative_to(PACKAGE_ROOT)),
-)
+def modules_outside(allowed: set[str]) -> list[Path]:
+    return [
+        p for p in PACKAGE_ROOT.rglob("*.py") if p.relative_to(PACKAGE_ROOT).parts[0] not in allowed
+    ]
+
+
+def module_id(path: Path) -> str:
+    return str(path.relative_to(PACKAGE_ROOT))
+
+
+@pytest.mark.parametrize("path", modules_outside(LABEL_ACCESS), ids=module_id)
 def test_pipeline_code_never_touches_ground_truth(path):
-    """Hard rule 2: only nullpunkt.evaluation may read labels."""
+    """Hard rule 3: pipeline and app code never see labels."""
     names = imported_names(path)
     assert "GroundTruth" not in names
     assert not any(n.startswith("nullpunkt.evaluation") for n in names)
-    assert "labels.csv" not in path.read_text()
+    text = path.read_text()
+    for name in TRUTH_FILES:
+        assert name not in text
+
+
+@pytest.mark.parametrize("path", modules_outside(GENERATOR_ACCESS), ids=module_id)
+def test_pipeline_code_never_imports_generator(path):
+    """Pipeline code (ingestion, correlation, attack, scoring, briefing, storage) and app/
+    must not import the generator: its scenario definitions reveal the answers."""
+    assert not any(n.startswith("nullpunkt.generator") for n in imported_names(path))
+
+
+def test_guards_cover_app_package():
+    """app/ does not exist yet, but it is not on either allow-list, so the guards will
+    cover it as soon as it does."""
+    assert "app" not in LABEL_ACCESS | GENERATOR_ACCESS
+
+
+def test_write_ground_truth_round_trips_byte_for_byte(sample_dir, tmp_path):
+    labels = load_ground_truth(sample_dir / "labels.csv")
+    path = tmp_path / "labels.csv"
+    write_ground_truth(labels.values(), path)
+    assert load_ground_truth(path) == labels
+    assert path.read_bytes() == (sample_dir / "labels.csv").read_bytes()
