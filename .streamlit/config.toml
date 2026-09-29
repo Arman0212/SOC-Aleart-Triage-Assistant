@@ -1,0 +1,16 @@
+# Dark SOC theme. Tier colours (P1 red, P2 amber, P3 blue, P4 grey) come from
+# nullpunkt.app.views.TIER_COLOURS and are always shown with their text label.
+[theme]
+base = "dark"
+primaryColor = "#3b82f6"
+backgroundColor = "#0b1220"
+secondaryBackgroundColor = "#131c2e"
+textColor = "#e6edf3"
+font = "sans serif"
+baseFontSize = 16
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"

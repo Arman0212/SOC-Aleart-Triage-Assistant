@@ -62,13 +62,20 @@ def imported_names(path: Path) -> set[str]:
     return names
 
 
+# The Streamlit scripts live outside the package, in app/ at the repo root; they are app code.
+APP_ROOT = Path(__file__).parents[2] / "app"
+
+
 def modules_outside(allowed: set[str]) -> list[Path]:
-    return [
+    package = [
         p for p in PACKAGE_ROOT.rglob("*.py") if p.relative_to(PACKAGE_ROOT).parts[0] not in allowed
     ]
+    return package + sorted(APP_ROOT.rglob("*.py"))
 
 
 def module_id(path: Path) -> str:
+    if path.is_relative_to(APP_ROOT):
+        return "repo:app/" + str(path.relative_to(APP_ROOT))
     return str(path.relative_to(PACKAGE_ROOT))
 
 
@@ -90,10 +97,16 @@ def test_pipeline_code_never_imports_generator(path):
     assert not any(n.startswith("nullpunkt.generator") for n in imported_names(path))
 
 
-def test_guards_cover_app_package():
-    """app/ does not exist yet, but it is not on either allow-list, so the guards will
-    cover it as soon as it does."""
+def test_guards_cover_the_app():
+    """Both the app logic (src/nullpunkt/app/) and the Streamlit scripts (app/) are checked."""
     assert "app" not in LABEL_ACCESS | GENERATOR_ACCESS
+    ids = {module_id(p) for p in modules_outside(LABEL_ACCESS)}
+    assert {
+        "repo:app/streamlit_app.py",
+        "repo:app/pages/incident.py",
+        "app/ui.py",
+        "storage/prepare.py",
+    } <= ids
 
 
 def test_write_ground_truth_round_trips_byte_for_byte(sample_dir, tmp_path):
