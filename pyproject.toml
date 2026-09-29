@@ -32,11 +32,14 @@ dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.16", "pre-commit>=3.8"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-nullpunkt = ["attack/data/*.json"]
+nullpunkt = ["attack/data/*.json", "briefing/prompts/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+    "ollama: needs a running Ollama server with the configured model (skipped otherwise)",
+]
 
 [tool.ruff]
 line-length = 100
