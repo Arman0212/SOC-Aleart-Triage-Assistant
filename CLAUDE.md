@@ -22,7 +22,8 @@ listed in `pyproject.toml`; use only those.
 - Phase 1 (synthetic data generator) is done.
 - Phase 2 (correlation) is done.
 - Phases 3–4 (ATT&CK mapping, risk scoring, the pipeline orchestrator) are done.
-- `briefing` and `storage` are still empty.
+- Phase 5 (AI shift briefs with Phi via Ollama, template fallback) is done.
+- `storage` and the review app are not built yet.
 
 ## Architecture
 
@@ -74,7 +75,12 @@ ingestion  correlation  attack      scoring  briefing  Streamlit + storage
   - `metrics.py` also has `ranking_metrics`.
   - `baselines.py`: severity-only and alert-count orderings.
   - `sweep_scoring.py`: tuning on seeds 101–105, with seed 42 held out.
-- `briefing`, `storage`: pipeline stages, not yet implemented.
+- `briefing`: `context.py` (the compact incident JSON), `llm.py` (`LLMClient` protocol,
+  `OllamaClient`, `FakeClient` for tests), `prompts/brief_v1.md` (versioned prompt), `validation.py`
+  (hallucination guard), `template.py` (fallback), `engine.py` (`generate_brief`, `brief_all`,
+  cache, evidence-based confidence). Tests never need Ollama; the one `@pytest.mark.ollama` test
+  skips without it. See `docs/briefing_evaluation.md`.
+- `storage`: not yet implemented.
 - An `Incident` is enriched step by step: `techniques`, then `score`, then `brief`, then `status`.
 
 The batch format is three files plus a manifest:
@@ -122,6 +128,8 @@ python -m nullpunkt.generator --out data/generated/batch-001   # generate a 3,00
 python -m nullpunkt.correlation --batch data/generated/batch-001   # correlate it into incidents
 python -m nullpunkt.pipeline --batch data/generated/batch-001      # full ranking: top 10 + tiers
 python -m nullpunkt.evaluation.sweep_scoring                       # re-tune scoring (~5 s)
+python -m nullpunkt.pipeline --batch data/generated/batch-001 --briefs   # + Phi briefs (Ollama)
+python -m nullpunkt.evaluation.brief_eval --out brief_eval.json    # brief evaluation (~7 min)
 python -m nullpunkt.evaluation.sweep_correlation   # re-tune correlation (~4-5 min)
 ruff check .                 # lint
 ruff format .                # format (CI runs `ruff format --check .`)
