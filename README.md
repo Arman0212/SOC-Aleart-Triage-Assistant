@@ -102,6 +102,15 @@ python -m nullpunkt.pipeline --batch data/generated/batch-001
 python -m nullpunkt.pipeline --batch data/generated/batch-001 --briefs
 ```
 
+To triage a shift in the analyst app:
+
+```bash
+nullpunkt-prepare-shift --batch data/generated/batch-001   # run everything once, store in SQLite
+streamlit run app/streamlit_app.py                         # queue, incident pages, handover
+```
+
+See [docs/analyst_app.md](docs/analyst_app.md).
+
 | Seed-42 scenario rank | Our score | Severity-only | Alert count |
 |---|---|---|---|
 | SCN-01 phishing → finance DB (low/medium alerts only) | **1** | 51 | 52 |
@@ -121,8 +130,8 @@ assets = load_assets("data/sample/assets.csv")  # 9 hosts keyed by name
 
 ## Project status
 
-Phases 0–5 are done: foundation, synthetic data generator, correlation, ATT&CK mapping, risk
-scoring, and AI shift briefs. The later phases are listed in the project plan.
+Phases 0–6 are done: foundation, synthetic data generator, correlation, ATT&CK mapping, risk
+scoring, AI shift briefs, and the analyst app with decision storage. The later phases are listed in the project plan.
 
 | Component | Status |
 |---|---|
@@ -132,7 +141,7 @@ scoring, and AI shift briefs. The later phases are listed in the project plan.
 | ATT&CK mapping (Enterprise ATT&CK v19.2) | done |
 | Risk scoring and P1–P4 tiers (all 7 scenarios in the top 10) | done |
 | AI shift briefs (Phi via Ollama, validated, template fallback) | done |
-| SQLite storage, Streamlit app | not started |
+| SQLite storage, prepare-shift CLI, Streamlit analyst app, handover report | done |
 | Evaluation: correlation and ranking metrics, baselines | done |
 | Evaluation: MTTT before vs after | not started |
 | Azure deployment (Phase 8) | not started |

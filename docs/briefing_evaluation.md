@@ -26,28 +26,40 @@ python -m nullpunkt.evaluation.brief_eval --out brief_eval.json          # this 
 
 ## Headline
 
-| | Final run |
-|---|---|
-| Top-10 briefs passed validation first time | **10 / 10** |
-| Passed after one retry / fell back to the template | 0 / 0 |
-| Latency per brief, p50 / p95 / max | **17.1 s / 19.9 s / 20.9 s** |
-| Brief generation for the top 10, empty cache | **161.5 s** |
-| Same run again, from the cache | **0.01 s** |
-| Scenario briefs whose techniques match the scenario's true techniques | 7 / 7 full recall; precision 1.0 on 6, 0.8 on SCN-05 |
-| Line 1 reads as an analyst verdict | 9 / 10 |
-| Prompt injection against the real model | ignored; the brief passed validation and never mentioned EVIL01 |
+There are two runs on seed 42, with the same model, prompt version and settings:
 
-**An earlier run** used the same prompt with evidence rows listed one alert at a time (before
-bursts were grouped). It passed 8 first time, 1 after a retry and 1 fell back, and took 341 s
-including the model's cold start. Details are under [What the validator caught](#what-the-validator-caught).
+- **Run A (timing reference):** an idle machine, before the Phase 6 fixes.
+- **Run B (current code):** after two fixes:
+  - wider tactic-claim vocabulary in the validator
+  - real failure counts in "Successful login after failures" and "Account lockout" messages
+
+  It ran while the laptop was also running the app's test suite, so its **latencies are
+  inflated and aren't used as timing figures**. A second idle attempt of Run B didn't finish: the
+  8 GB machine ran out of memory, with the model, the IDE and the tests all running at once.
+
+| | Run A (idle, before fixes) | Run B (current code) |
+|---|---|---|
+| Top-10 briefs passed validation first time | 10 / 10 | **9 / 10** |
+| Passed after one retry / fell back to the template | 0 / 0 | **1 / 0** (SCN-02: the new vocabulary caught an exfiltration claim) |
+| Latency per brief, p50 / p95 / max | **17.1 s / 19.9 s / 20.9 s** | not representative (48.6 / 87.0 / 98.5 s under load) |
+| Brief generation for the top 10, empty cache | **161.5 s** | not representative (548.6 s under load) |
+| Same run again, from the cache | 0.01 s | **0.02 s** |
+| Technique match with the scenario's true techniques | full recall on 7 / 7; precision 1.0 on 6 and 0.8 on SCN-05 | full recall on 7 / 7; precision 1.0 on 6 and **0.67** on SCN-05 |
+| Line 1 reads as an analyst verdict | 9 / 10 | **9 / 10** (SCN-03 restates the alert) |
+| Verdicts that over-claim a stage | 1 (SCN-02, "data theft") | **0** |
+| Prompt injection against the real model | ignored | **ignored**: passed validation, no EVIL01, not "benign" |
+
+**An earlier run** (before evidence bursts were grouped into single rows) passed 8 first time, 1
+after a retry and 1 fell back, and took 341 s including the model's cold start. Details are under
+[What the validator caught](#what-the-validator-caught).
 
 ## Generation time vs analyst triage time
 
 Brief generation is **not** part of analyst triage time, and we don't hide its cost:
 
 - **Timing.** Briefs are generated **in the background as soon as a batch is ranked, before the
-  analyst opens the queue.** On this laptop the top 10 take about 2.7 minutes (161.5 s) with a warm
-  model. A cold start plus retries took up to 5.7 minutes (341 s) in the earlier run.
+  analyst opens the queue.** On this laptop the top 10 take about 2.7 minutes (161.5 s, Run A) with a
+  warm model. A cold start plus retries took up to 5.7 minutes (341 s) in the earlier run.
 - **Re-opens are free.** Re-opening the same batch, or re-running the demo, is served from the
   cache in about 0.01 s.
 - **If the analyst opens the queue before generation finishes,** the ranking, scores and
@@ -59,35 +71,38 @@ Brief generation is **not** part of analyst triage time, and we don't hide its c
   this hardware). A before/after MTTT comparison must state that generation cost, and it must not
   count it as zero.
 
-## Per-brief results (final run)
+## Per-brief results (Run B, current code)
 
-| Rank | Tier | Incident | Scenario | Path | Latency | Techniques P / R | Line 1 is a verdict? |
-|---|---|---|---|---|---|---|---|
-| 1 | P1 | INC-0055 | SCN-01 | first pass | 20.9 s | 1.0 / 1.0 | yes: "The account jill.rhodes is likely compromised with access to a critical database, risking data theft." |
-| 2 | P1 | INC-0065 | SCN-06 | first pass | 11.7 s | 1.0 / 1.0 | yes, but loosely attributed: "FS01 is likely compromised, with the user's data at risk due to the stopping of the backup service." |
-| 3 | P1 | INC-0053 | SCN-04 | first pass | 11.6 s | 1.0 / 1.0 | yes: "The account 'rita.harrell' is likely compromised, with potential for credential theft and privilege escalation at the critical asset 'DC01'." |
-| 4 | P1 | INC-0013 | SCN-05 | first pass | 18.1 s | 0.8 / 1.0 | yes: "The account jeremy.johnson is likely compromised and sensitive data on file server FS02 is at risk of theft and exfiltration." |
-| 5 | P2 | INC-0064 | SCN-03 | first pass | 15.2 s | 1.0 / 1.0 | **no**: it restates the alert ("WEB02 web server experienced an exploit attempt signature…") |
-| 6 | P2 | INC-0061 | SCN-02 | first pass | 13.9 s | 1.0 / 1.0 | yes, but over-claims: "The account angela.cohen is likely compromised with potential data theft…" (collection was never reached) |
-| 7 | P2 | INC-0057 | SCN-07 | first pass | 17.1 s | 1.0 / 1.0 | yes: "The laptop LT-IT-06 is likely compromised, with sensitive data at risk of exfiltration." |
-| 8 | P2 | INC-0023 | noise | first pass | 18.7 s | – | yes |
-| 9 | P2 | INC-0032 | noise | first pass | 17.1 s | – | yes |
-| 10 | P2 | INC-0021 | noise | first pass | 17.3 s | – | yes |
+Latencies are omitted here, because they were measured under load (see above).
+
+| Rank | Tier | Incident | Scenario | Path | Techniques P / R | Line 1 is a verdict? |
+|---|---|---|---|---|---|---|
+| 1 | P1 | INC-0055 | SCN-01 | first pass | 1.0 / 1.0 | yes: "The account jill.rhodes is likely compromised with access to a critical database, risking data theft." |
+| 2 | P1 | INC-0065 | SCN-06 | first pass | 1.0 / 1.0 | yes: "The account adm-shawn.mckay is likely compromised, with the file server FS01's data at risk…" (still links the risk loosely to the backup service stopping) |
+| 3 | P1 | INC-0053 | SCN-04 | first pass | 1.0 / 1.0 | yes: "The account svc-sql on workstation WS-LEG-02 is likely compromised, with potential privilege escalation and credential access at domain controller DC01." |
+| 4 | P1 | INC-0013 | SCN-05 | first pass | 0.67 / 1.0 | yes: "The account jeremy.johnson is likely compromised and sensitive data on file server FS02 is at risk of theft and exfiltration." |
+| 5 | P2 | INC-0064 | SCN-03 | first pass | 1.0 / 1.0 | **no**: it restates the alert ("WEB02 web server experienced an exploit attempt signature…") |
+| 6 | P2 | INC-0061 | SCN-02 | after retry | 1.0 / 1.0 | yes, and now accurate: "The account angela.cohen is likely compromised, with credentials potentially accessed on VPN01 and discovery activities conducted on DC01 and FS01." |
+| 7 | P2 | INC-0057 | SCN-07 | first pass | 1.0 / 1.0 | yes: "The laptop LT-IT-06 is likely compromised, with data exfiltration to a newly registered domain at stake." |
+| 8 | P2 | INC-0023 | noise | first pass | – | yes |
+| 9 | P2 | INC-0032 | noise | first pass | – | yes |
+| 10 | P2 | INC-0021 | noise | first pass | – | yes |
 
 **How to read the table:**
 
-- **Techniques P / R** compares the brief's technique IDs with the scenario's labelled
-  `true_technique`s. Labels are used only here, in evaluation.
-- **SCN-05's precision is 0.8** because the brief also lists T1110.001 (password guessing). That
-  technique is really on the incident, from the user's typo noise, but it isn't part of the
-  scenario.
+- **SCN-05's precision is 0.67** because the brief also lists T1110.001 and T1110 (password
+  guessing and brute force). Both are really on the incident, from the user's typo noise, but
+  they aren't part of the scenario.
 - **The verdict column is my reading**, not an automatic check.
-- **Model confidence** was recorded, as the design requires, and not used. Phi answered "high" or
-  "medium". The evidence rule gave 6 high and 4 medium.
+- **Model confidence** was recorded, not used. The evidence rule gave 6 high and 4 medium.
 
 ## What the validator caught
 
-**In the final run:** nothing; all 10 drafts were valid on the first attempt.
+**Run B (current code):** one catch. SCN-02's first draft was rejected with "summary claims
+exfiltration, but the incident never reached exfiltration". The retry produced an accurate
+verdict (credentials and discovery only).
+
+**Run A:** nothing; all 10 drafts were valid on the first attempt.
 
 **In the earlier run**, before evidence bursts were grouped into single rows:
 
@@ -136,7 +151,7 @@ case a future model or prompt behaves differently.
 
 ## Example briefs
 
-### SCN-01, INC-0055 (LLM, first pass, confidence high)
+### SCN-01, INC-0055 (LLM, Run B, first pass, confidence high)
 
 > The account jill.rhodes is likely compromised with access to a critical database, risking data theft.
 > The breach started with a spear-phishing email containing a malicious attachment.
@@ -148,15 +163,17 @@ case a future model or prompt behaves differently.
 **Timeline:**
 - 14:03 IST - suspicious attachment delivered to jill.rhodes on WS-FIN-03
 - 14:07 IST - PowerShell started by EXCEL.EXE for jill.rhodes
-- 14:27 IST - login from new source host to FINDB01
-- 14:31 IST - SMB admin share access from WS-FIN-03 to FINDB01
-- 14:36 IST - bulk read of database files on FINDB01
+- 14:27 IST - jill.rhodes logged on to FINDB01 from a new source host
+- 14:31 IST - jill.rhodes accessed SMB admin share on FINDB01
+- 14:36 IST - jill.rhodes read 12.0 GB of database files on FINDB01
 
 **Next action:** Identify what data was accessed on FINDB01 and preserve the access logs. Isolate
 WS-FIN-03 and block its admin access to FINDB01. Reset jill.rhodes' password and revoke its
 sessions.
 
-### SCN-05, INC-0013 (LLM, first pass, confidence high)
+"Data theft" passes the validator here because SCN-01 reached collection.
+
+### SCN-05, INC-0013 (LLM, Run B, first pass, confidence high)
 
 This is 64 alerts, 56 of them routine typos. The brief leads with the file server and the
 exfiltration.
@@ -166,19 +183,21 @@ exfiltration.
 
 **Assets:** FS02
 
-**Techniques:** T1110.001, T1078, T1039, T1560.001, T1567.002
+**Techniques:** T1110.001, T1078, T1110, T1039, T1560.001, T1567.002
 
 **Timeline:**
 - 11:48 IST - First interactive logon by jeremy.johnson to FS02 from 10.50.0.117
 - 11:54 IST - Account jeremy.johnson locked out after 4 failed attempts from 10.40.0.20
 - 12:07–12:12 IST - Mass file access on share by jeremy.johnson on FS02
-- 12:37 IST - Large archive created on FS02 by jeremy.johnson
-- 12:56 IST - Large outbound transfer to 203.0.113.231 from FS02
+- 12:37 IST - Large archive created by jeremy.johnson on FS02
+- 12:56 IST - Large outbound transfer from PROXY01 to 203.0.113.231
 - 14:46 IST - Account jeremy.johnson locked out after 4 failed attempts from 10.50.0.161
-- 09:08–18:35 IST - 46 failed logins, 10 successful logins after failures
 
 **Next action:** Block the exfiltration destination, preserve evidence and estimate what data
-left. Identify what data was accessed on FS02 and preserve the access logs as evidence.
+left. Identify what data was accessed and preserve the access logs as evidence.
+
+The "4 failed attempts" in the lockout messages is now the real count: those typo bursts had 4
+failures each.
 
 ### Template fallback: SCN-02, INC-0061 (confidence high)
 
@@ -260,14 +279,14 @@ instead of timing out ten times.
 ## Limitations
 
 - **Wrong attribution between valid facts isn't caught.** The validator checks identifiers and
-  tactic words, not meaning. Right host with the wrong action, or "data theft" phrased so it
-  avoids the tactic words, passes. In the final run that meant SCN-02's "potential data theft"
-  and SCN-06's loose "due to the stopping of the backup service". Each brief keeps its timeline
-  and score explanation beside it, so the analyst can check.
-- **Numbers inside alert messages are repeated as given.** "after 4 failed attempts" in SCN-02
-  and SCN-05 comes from the message text. In SCN-02 the grouped row shows 8 failures, so the two
-  disagree. Counts from our own grouping are reliable; numbers inside messages are only as good
-  as the source.
+  claim phrases, not meaning. Right host with the wrong action passes, and so would an over-claim
+  phrased in words outside the vocabulary. The vocabulary covers common paraphrases such as "data
+  theft", "stole data", "exfil", "data leak", "took over the account", "stole credentials" and
+  "pivoted". In Run B that leaves SCN-06's loose "due to the stopping of the backup service".
+  Each brief keeps its timeline and score explanation beside it, so the analyst can check.
+- **Numbers inside alert messages are repeated as given.** The generator now writes the real
+  failure counts into login and lockout messages (Phase 6 fix), so those agree with the evidence.
+  Other numbers inside messages (file counts, sizes) are only as good as their source.
 - **Line 1 isn't always a verdict.** SCN-03's brief restated the key alert. The prompt asks for a
   verdict and the example shows one, but the validator can't enforce style.
 - **User names are only checked in lowercase.** Phi sometimes writes a user as a proper name

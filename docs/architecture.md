@@ -4,13 +4,16 @@ Nullpunkt turns a shift's worth of alerts (about 3,000) into about 60 ranked inc
 MITRE ATT&CK techniques, an explainable risk score and a short brief that an analyst approves.
 Types are defined in [data_contract.md](data_contract.md).
 
-> **Status: Phase 5.**
+> **Status: Phase 6.** Built:
 >
-> - **Built:** the contract, loaders, sample batch and tests, the synthetic data generator
->   ([scenarios.md](scenarios.md)), stages 1–5 (ingestion, [correlation](#correlation), ATT&CK
->   mapping, [risk scoring](#ranking) and [briefs](#briefs-and-analyst-review)), and the pipeline
->   orchestrator (`nullpunkt.pipeline`).
-> - **Designed only:** storage and the review app.
+> - the contract, loaders, sample batch and tests
+> - the synthetic data generator ([scenarios.md](scenarios.md))
+> - stages 1–5: ingestion, [correlation](#correlation), ATT&CK mapping, [risk scoring](#ranking)
+>   and [briefs](#briefs-and-analyst-review)
+> - the pipeline orchestrator (`nullpunkt.pipeline`)
+> - SQLite storage and the analyst app ([analyst_app.md](analyst_app.md))
+>
+> The MTTT study (Phase 7) is next.
 
 ## Pipeline
 
@@ -203,10 +206,20 @@ and the evaluation on the real model are in [briefing_evaluation.md](briefing_ev
 Briefs are generated before the analyst opens the queue: generation cost is separate from triage
 time, and both are reported.
 
-In the review app (not yet built), the analyst approves, edits, dismisses or escalates each
-incident.
-Every analyst action will be stored as a `Decision`, whose `triage_seconds` feeds the MTTT
-measurement.
+**Preparing and reviewing a shift.** `nullpunkt-prepare-shift` runs this pipeline, briefs
+included, and stores the shift in SQLite (`nullpunkt.storage`). The Streamlit app in `app/`
+reads and writes only that database; it never runs correlation or the model.
+
+In the app, the analyst approves, edits, dismisses or escalates each incident. Each action is
+stored as a `Decision`:
+
+- **Timing:** `opened_at` is captured in the database on first open, and `triage_seconds` feeds
+  MTTT (first decisions only).
+- **Audit:** every action goes to an append-only audit log.
+- **Study sessions:** decisions made inside a study session can be analysed separately for the
+  Phase 7 study.
+
+See [analyst_app.md](analyst_app.md).
 
 ## Ground-truth boundary
 
