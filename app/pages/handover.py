@@ -9,7 +9,7 @@ ctx = sidebar()
 batch = require_batch(ctx)
 
 st.markdown(f"## Handover · {batch.batch_id}")
-handover = build_handover(ctx.repo, batch.batch_id)
+handover = build_handover(ctx.repo, batch.batch_id, ctx.session_id)
 markdown = to_markdown(handover)
 
 c1, c2 = st.columns(2)

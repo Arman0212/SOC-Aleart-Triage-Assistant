@@ -50,9 +50,10 @@ class ShiftStats:
         return self.incidents - self.decided
 
 
-def shift_stats(repo: Repository, batch_id: str) -> ShiftStats:
+def shift_stats(repo: Repository, batch_id: str, scope: str | None = None) -> ShiftStats:
+    """Stats for one scope: a study session, or (None) normal shift work outside sessions."""
     batch = repo.batch(batch_id)
-    decisions = repo.decisions(batch_id)
+    decisions = repo.scoped_decisions(batch_id, scope)
     latest = latest_decisions(decisions)
     tiers = Counter(row.tier for row in repo.queue(batch_id))
     return ShiftStats(

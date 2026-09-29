@@ -11,7 +11,7 @@ ctx = sidebar()
 batch = require_batch(ctx)
 repo = ctx.repo
 
-stats = shift_stats(repo, batch.batch_id)
+stats = shift_stats(repo, batch.batch_id, ctx.session_id)
 st.markdown(f"## Shift {batch.batch_id}")
 cols = st.columns(5)
 cols[0].metric("Alerts in shift", f"{stats.alerts:,}")
@@ -32,7 +32,7 @@ statuses = f2.multiselect(
     key="f_status",
 )
 
-rows = repo.queue(batch.batch_id, tiers=tiers, statuses=statuses)
+rows = repo.queue(batch.batch_id, tiers=tiers, statuses=statuses, scope=ctx.session_id)
 top = max((r.risk for r in repo.queue(batch.batch_id)[:1]), default=0.0)
 
 if not rows:

@@ -45,15 +45,15 @@ class Handover:
     brief_counts: dict[str, int]
 
 
-def build_handover(repo: Repository, batch_id: str) -> Handover:
+def build_handover(repo: Repository, batch_id: str, scope: str | None = None) -> Handover:
     batch = repo.batch(batch_id)
-    latest = latest_decisions(repo.decisions(batch_id))
+    latest = latest_decisions(repo.scoped_decisions(batch_id, scope))
     items = []
     for row in repo.queue(batch_id):
         decision = latest.get(row.incident_id)
         if decision is None or decision.action not in REPORTED:
             continue
-        view = repo.incident(batch_id, row.incident_id)
+        view = repo.incident(batch_id, row.incident_id, scope)
         if decision.action is DecisionAction.EDIT and decision.edited_brief:
             text = decision.edited_brief
         elif view.brief is not None:
@@ -63,7 +63,7 @@ def build_handover(repo: Repository, batch_id: str) -> Handover:
         items.append(ReportItem(row.rank, row.tier, row.incident_id, row.risk, decision, text))
     brief_counts = repo.brief_sources(batch_id)
     repo.log("report", "report_exported", batch_id, payload={"items": len(items)})
-    return Handover(batch, shift_stats(repo, batch_id), items, repo.now(), brief_counts)
+    return Handover(batch, shift_stats(repo, batch_id, scope), items, repo.now(), brief_counts)
 
 
 def _local(ts: datetime, tz: str) -> str:

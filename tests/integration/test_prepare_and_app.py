@@ -206,21 +206,46 @@ def test_redecision_via_change_decision(db):
     repo.close()
 
 
-def test_study_session_controls_tag_decisions(db):
+def _start_tool_session(code: str) -> AppTest:
     at = app()
     at.run()
-    at.sidebar.text_input(key="analyst").input("jane").run()
-    at.sidebar.button(key="session_start").click().run()
+    at.sidebar.text_input(key="s_participant").input(code).run()
+    at.sidebar.radio(key="s_arm").set_value("tool").run()
+    return at.sidebar.button(key="session_start").click().run()
+
+
+def _approve_top(at: AppTest) -> AppTest:
+    at.selectbox(key="open_choice").select("INC-0055").run()
+    at.button(key="open_incident").click().run()
+    at.switch_page("pages/incident.py").run()
+    return at.button(key="approve").click().run()
+
+
+def test_study_session_controls_tag_decisions(db):
+    at = _start_tool_session("P9")
     repo = SQLiteRepository(db)
-    session = repo.running_session("jane")
-    assert session is not None and session.batch_id == B
-    at = open_incident(at, "INC-0055")
-    at.button(key="approve").click().run()
+    session = repo.running_session("P9")
+    assert session is not None and session.batch_id == B and session.arm == "tool"
+    _approve_top(at)
     assert repo.decisions(B)[0].study_session == session.session_id
+    assert repo.incident(B, "INC-0055").status == "open"  # study work never touches the shift
     at.sidebar.button(key="session_end").click().run()
-    assert repo.running_session("jane") is None
+    assert repo.running_session("P9") is None
     events = [e["event"] for e in repo.audit(B)]
     assert "session_started" in events and "session_ended" in events
+    repo.close()
+
+
+def test_each_participant_starts_from_a_fresh_queue(db):
+    _approve_top(_start_tool_session("P1"))
+    at = _start_tool_session("P2")
+    assert not at.exception
+    metrics = {m.label: m.value for m in at.metric}
+    assert metrics["Decided"] == "0 / 65"
+    assert at.dataframe[0].value["Status"].iloc[0] == "open"
+    _approve_top(at)  # P2 can triage INC-0055 although P1 already approved it
+    repo = SQLiteRepository(db)
+    assert [d.analyst for d in repo.decisions(B)] == ["P1", "P2"]
     repo.close()
 
 

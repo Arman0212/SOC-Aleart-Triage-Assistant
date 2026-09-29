@@ -32,7 +32,7 @@ if not incident_id:
 st.query_params["incident"] = incident_id
 
 try:
-    view = repo.incident(batch.batch_id, incident_id)
+    view = repo.incident(batch.batch_id, incident_id, scope=ctx.session_id)
 except KeyError:
     st.error(f"{incident_id} is not in shift {batch.batch_id}.")
     st.stop()
