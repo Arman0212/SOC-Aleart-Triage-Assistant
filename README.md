@@ -97,6 +97,9 @@ whole in a single incident. See [docs/correlation_tuning.md](docs/correlation_tu
 ```bash
 # the full pipeline: correlate, map to ATT&CK, score and rank (top 10 with P1-P4 tiers)
 python -m nullpunkt.pipeline --batch data/generated/batch-001
+
+# ... plus shift briefs for the top 10 from Phi via Ollama (template fallback without it)
+python -m nullpunkt.pipeline --batch data/generated/batch-001 --briefs
 ```
 
 | Seed-42 scenario rank | Our score | Severity-only | Alert count |
@@ -118,8 +121,8 @@ assets = load_assets("data/sample/assets.csv")  # 9 hosts keyed by name
 
 ## Project status
 
-Phases 0–4 are done: foundation, synthetic data generator, correlation, ATT&CK mapping, and risk
-scoring. The later phases are listed in the project plan.
+Phases 0–5 are done: foundation, synthetic data generator, correlation, ATT&CK mapping, risk
+scoring, and AI shift briefs. The later phases are listed in the project plan.
 
 | Component | Status |
 |---|---|
@@ -128,7 +131,8 @@ scoring. The later phases are listed in the project plan.
 | Correlation (3,000 alerts → 65 incidents, all scenarios whole) | done |
 | ATT&CK mapping (Enterprise ATT&CK v19.2) | done |
 | Risk scoring and P1–P4 tiers (all 7 scenarios in the top 10) | done |
-| Phi briefs, SQLite storage, Streamlit app | not started |
+| AI shift briefs (Phi via Ollama, validated, template fallback) | done |
+| SQLite storage, Streamlit app | not started |
 | Evaluation: correlation and ranking metrics, baselines | done |
 | Evaluation: MTTT before vs after | not started |
 | Azure deployment (Phase 8) | not started |

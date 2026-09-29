@@ -4,12 +4,13 @@ Nullpunkt turns a shift's worth of alerts (about 3,000) into about 60 ranked inc
 MITRE ATT&CK techniques, an explainable risk score and a short brief that an analyst approves.
 Types are defined in [data_contract.md](data_contract.md).
 
-> **Status: Phases 3–4.**
+> **Status: Phase 5.**
 >
 > - **Built:** the contract, loaders, sample batch and tests, the synthetic data generator
->   ([scenarios.md](scenarios.md)), stages 1–4 (ingestion, [correlation](#correlation), ATT&CK
->   mapping and [risk scoring](#ranking)), and the pipeline orchestrator (`nullpunkt.pipeline`).
-> - **Designed only:** stage 5 (briefing), storage and the review app.
+>   ([scenarios.md](scenarios.md)), stages 1–5 (ingestion, [correlation](#correlation), ATT&CK
+>   mapping, [risk scoring](#ranking) and [briefs](#briefs-and-analyst-review)), and the pipeline
+>   orchestrator (`nullpunkt.pipeline`).
+> - **Designed only:** storage and the review app.
 
 ## Pipeline
 
@@ -167,12 +168,45 @@ buries SCN-01 and ranking by severity × criticality puts it at the top.
 
 ## Briefs and analyst review
 
-- `briefing` asks Phi (the `OLLAMA_MODEL` served at `OLLAMA_HOST`) for a structured brief.
-- If the model is unavailable, or its output fails validation, `briefing` falls back to a
-  template brief. `Brief.generated_by` records which path produced it.
-- `Brief.validated` is `True` only if every host in `affected_assets` appears in `Incident.hosts` and every ID in `techniques` appears in `Incident.techniques`; otherwise the template fallback is used.
-- In the Streamlit app, the analyst approves, edits, dismisses or escalates each incident. Every
-  action is stored as a `Decision`, whose `triage_seconds` feeds the MTTT measurement.
+`briefing` writes a shift brief for each of the top N incidents (10 by default). The details
+and the evaluation on the real model are in [briefing_evaluation.md](briefing_evaluation.md).
+
+1. **Context.** A compact JSON summary, never raw alerts:
+   - a headline from the score (asset at risk, key alert, tactics reached)
+   - the assets at risk
+   - evidence alerts one by one, and routine alerts collapsed ("46 × Failed login, …, routine")
+   - techniques
+   - the response-playbook entries for the tactics reached
+   - times in `site.timezone`
+
+   Alert messages are marked untrusted, and the whole context sits in a delimited data block.
+2. **Model.** Phi via Ollama, behind the `LLMClient` protocol:
+   - `phi4-mini` by default; `OLLAMA_MODEL` and `OLLAMA_HOST` override it
+   - temperature 0, a fixed seed
+   - structured output: the reply is JSON constrained to the draft schema
+   - the prompt is versioned in `briefing/prompts/brief_v1.md`
+3. **Validation.** A draft is rejected if it names:
+   - a host, IP, user, account or technique that isn't a trusted fact of the incident
+   - a tactic the incident didn't reach
+   - more than it should: over two lines or sentences of summary, an oversized timeline, or a
+     long next action
+
+   One retry feeds the errors back.
+4. **Fallback.** A deterministic template brief is used when the model is unreachable or times
+   out, or when validation fails twice.
+5. **Result.**
+   - `Brief.validated` is `True` only for briefs that passed validation; template briefs pass by
+     construction.
+   - `Brief.confidence` comes from the evidence (tactics and rules), not from the model.
+   - Validated LLM briefs are cached by a hash of the context, prompt and model.
+
+Briefs are generated before the analyst opens the queue: generation cost is separate from triage
+time, and both are reported.
+
+In the review app (not yet built), the analyst approves, edits, dismisses or escalates each
+incident.
+Every analyst action will be stored as a `Decision`, whose `triage_seconds` feeds the MTTT
+measurement.
 
 ## Ground-truth boundary
 

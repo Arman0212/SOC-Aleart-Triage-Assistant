@@ -173,7 +173,7 @@ A shift brief for one incident, written by Phi or by a template fallback.
 | `next_action` | str | the recommended next step |
 | `confidence` | `Confidence` | `low`, `medium`, `high` |
 | `generated_by` | `BriefSource` | `llm` or `template` |
-| `validated` | bool | `True` only if every host in `affected_assets` appears in `Incident.hosts` and every ID in `techniques` appears in `Incident.techniques`; otherwise the template fallback is used |
+| `validated` | bool | `True` only if the brief passed the briefing validator (hosts, techniques, identifiers and tactic claims all grounded in the incident). Template briefs pass by construction; an LLM brief that fails twice is replaced by the template. See [briefing_evaluation.md](briefing_evaluation.md). |
 
 All fields are required.
 
