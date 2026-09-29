@@ -24,7 +24,10 @@ listed in `pyproject.toml`; use only those.
 - Phases 3–4 (ATT&CK mapping, risk scoring, the pipeline orchestrator) are done.
 - Phase 5 (AI shift briefs with Phi via Ollama, template fallback) is done.
 - Phase 6 (SQLite storage, prepare-shift CLI, Streamlit analyst app, handover report) is done.
-- Next: Phase 7, the MTTT study.
+- Phase 7 (before/after MTTT study tooling: time-boxed study sessions, raw alert-list baseline,
+  per-session decision scope, results command, protocol) is done. The real sessions are still
+  to run; `docs/mttt_study.md` is written only by the results command after them.
+- Next: Phase 8, Azure deployment.
 
 ## Architecture
 
@@ -84,15 +87,26 @@ ingestion  correlation  attack      scoring  briefing  Streamlit + storage
 - `storage`:
   - `db.py`: versioned SQL migrations in `storage/migrations/`
   - `repository.py`: the `Repository` protocol and `SQLiteRepository` (shifts, decisions with
-    DB-captured `opened_at`, study sessions, append-only audit log)
+    DB-captured `opened_at`, study sessions, append-only audit log). Study sessions (migration
+    002) have an arm, purpose and time box that the repository enforces at the exact deadline.
+    Baseline sessions write append-only `flags`. Queue, incident and decision reads take
+    `scope=<session_id>`, so each participant sees an untouched queue.
   - `prepare.py`: the `nullpunkt-prepare-shift` CLI
 - `app` (logic, `src/nullpunkt/app/`):
-  - `metrics.py`: first-decision MTTT, shift stats, `session_metrics`
+  - `metrics.py`: first-decision MTTT, shift stats (per scope), `session_metrics`
   - `report.py`: handover as Markdown and HTML
   - `views.py`: presentation helpers
-  - `ui.py`: Streamlit helpers
+  - `baseline.py`: the raw alert table and filters for the study's baseline arm
+  - `ui.py`: Streamlit helpers: sidebar, study session start form, countdown, and page
+    navigation per arm
 - `app/` (repo root): the Streamlit pages. Run `streamlit run app/streamlit_app.py`. They are
-  covered by the guard tests too. See `docs/analyst_app.md`.
+  covered by the guard tests too. See `docs/analyst_app.md`. `pages/baseline.py` is the
+  study's "Alert list" and must never show incidents, scores, tiers, ATT&CK or briefs.
+- `evaluation/mttt_study.py`: the before/after study analysis. It covers the schedule, detection
+  matching against labels, RMST censored at the time box, the KM median, the exact Wilcoxon p
+  (descriptive only), and the `docs/mttt_study.md` writer. Study batches come from
+  `configs/study_a.yaml` (seed 42), `configs/study_b.yaml` (seed 2026) and
+  `configs/study_practice.yaml` (no attacks). See `docs/study_protocol.md`.
 - An `Incident` is enriched step by step: `techniques`, then `score`, then `brief`, then `status`.
 
 The batch format is three files plus a manifest:
@@ -144,6 +158,9 @@ python -m nullpunkt.pipeline --batch data/generated/batch-001 --briefs   # + Phi
 python -m nullpunkt.evaluation.brief_eval --out brief_eval.json    # brief evaluation (~7 min)
 nullpunkt-prepare-shift --batch data/generated/batch-001           # pipeline + briefs -> SQLite
 streamlit run app/streamlit_app.py                                  # analyst app
+python -m nullpunkt.evaluation.mttt_study --db data/generated/study.db \
+    --batch study-A=data/generated/study-A --batch study-B=data/generated/study-B
+                                   # study results -> docs/mttt_study.md (after the sessions)
 python -m nullpunkt.evaluation.sweep_correlation   # re-tune correlation (~4-5 min)
 ruff check .                 # lint
 ruff format .                # format (CI runs `ruff format --check .`)
