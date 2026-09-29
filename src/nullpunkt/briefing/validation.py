@@ -9,7 +9,8 @@ A draft is rejected when:
   service/admin account or batch user that is not a trusted fact of this incident (identifiers
   that only occur inside untrusted alert messages are not trusted), or copy an identifier from
   the prompt's fictional example;
-- they name a tactic the incident did not reach ("exfiltration", "lateral movement", ...);
+- they claim a stage the incident did not reach ("exfiltration", "data theft", "took over the
+  account", "lateral movement", ...; see ``TACTIC_CLAIMS``);
 - the summary has more than two lines or two sentences (or more than 400 characters), the
   timeline is outside 1-8 entries, or the next action has more than three sentences.
 
@@ -36,20 +37,40 @@ ACCOUNT_RE = re.compile(r"\b(?:adm|svc)-[a-z0-9]+(?:[.-][a-z0-9]+)*")
 CVE_RE = re.compile(r"CVE-\d{4}-\d+")
 SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
 
-# Phrases that claim a tactic was reached.
-TACTIC_CLAIMS: dict[str, re.Pattern[str]] = {
-    "exfiltration": re.compile(r"exfiltrat", re.I),
-    "lateral-movement": re.compile(r"\blateral(ly)?\b", re.I),
-    "privilege-escalation": re.compile(
-        r"privilege escalation|escalat\w* (its |their )?privilege", re.I
-    ),
-    "persistence": re.compile(r"\bpersistence\b", re.I),
-    "command-and-control": re.compile(r"command[- ]and[- ]control|\bC2\b", re.I),
-    "credential-access": re.compile(r"credential (access|theft|dump)", re.I),
-    "reconnaissance": re.compile(r"\breconnaissance\b", re.I),
-    "impact": re.compile(r"\bransomware\b|inhibit\w* (system )?recovery", re.I),
-    "defense-impairment": re.compile(r"defen[cs]e impairment", re.I),
-}
+
+@dataclass(frozen=True)
+class TacticClaim:
+    """A phrase that claims the incident reached a stage, and the tactics that justify it."""
+
+    label: str
+    pattern: re.Pattern[str]
+    justified_by: frozenset[str]
+
+
+def _claim(label: str, pattern: str, *tactics: str) -> TacticClaim:
+    return TacticClaim(label, re.compile(pattern, re.I), frozenset(tactics))
+
+
+# Phrases (including common paraphrases) that claim a stage was reached.
+TACTIC_CLAIMS: tuple[TacticClaim, ...] = (
+    _claim("exfiltration", r"exfil|data leak|leaked (the )?data|leak(ed|ing)? (of )?data",
+           "exfiltration"),
+    _claim("data theft", r"data theft|\bst(o|ea)l(e|en|ing)?\b.{0,20}\bdata\b|"
+           r"\bdata\b.{0,20}\b(stolen|theft)\b", "exfiltration", "collection"),
+    _claim("account takeover", r"took over (the |an |their |its )?account|account takeover|"
+           r"hijack\w* (the |an |their |its )?account", "credential-access", "stealth"),
+    _claim("credential theft", r"credential (access|theft|dump)|st(o|ea)l(e|en|ing)? "
+           r"(the |their |its )?credentials|dump(ed|ing)? (the |their )?credentials",
+           "credential-access"),
+    _claim("lateral movement", r"\blateral(ly)?\b|\bpivot(ed|ing|s)?\b", "lateral-movement"),
+    _claim("privilege escalation", r"privilege escalation|escalat\w* (its |their )?privilege",
+           "privilege-escalation"),
+    _claim("persistence", r"\bpersistence\b", "persistence"),
+    _claim("command and control", r"command[- ]and[- ]control|\bC2\b", "command-and-control"),
+    _claim("reconnaissance", r"\breconnaissance\b", "reconnaissance"),
+    _claim("impact", r"\bransomware\b|inhibit\w* (system )?recovery", "impact"),
+    _claim("defense impairment", r"defen[cs]e impairment", "defense-impairment"),
+)  # fmt: skip
 
 MAX_SUMMARY_CHARS = 400
 MAX_TIMELINE = 8
@@ -124,11 +145,10 @@ def check_identifiers(text: str, where: str, ctx: BriefContext) -> list[str]:
     for account in sorted({a.rstrip(".") for a in ACCOUNT_RE.findall(text)}):
         if account not in t.users:
             errors.append(f"{where} mentions account '{account}', which is not in this incident")
-    for tactic, pattern in TACTIC_CLAIMS.items():
-        if pattern.search(text) and tactic not in t.tactics:
-            errors.append(
-                f"{where} claims {tactic.replace('-', ' ')}, which this incident did not reach"
-            )
+    for claim in TACTIC_CLAIMS:
+        if claim.pattern.search(text) and not claim.justified_by & t.tactics:
+            reached = " or ".join(sorted(x.replace("-", " ") for x in claim.justified_by))
+            errors.append(f"{where} claims {claim.label}, but the incident never reached {reached}")
     return errors
 
 

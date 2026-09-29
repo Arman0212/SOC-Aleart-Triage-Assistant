@@ -486,3 +486,67 @@ def test_repo_prompt_file_is_packaged():
     assert (
         Path(__file__).parents[2].joinpath("src/nullpunkt/briefing/prompts/brief_v1.md").is_file()
     )
+
+
+# --- tactic-claim paraphrases ------------------------------------------------------------------
+
+
+@pytest.fixture
+def ctx_vpn(mk):
+    """A VPN brute force: initial access, credential access (the failed logins), discovery.
+    No collection, exfiltration, lateral movement or stealth."""
+    ext = "198.51.100.5"
+    return make_context(
+        [
+            mk(0, "Failed login", "DC01", "low", JILL, ext),
+            mk(1, "Failed login", "DC01", "low", JILL, ext),
+            mk(3, "Successful login after failures", "DC01", "medium", JILL, ext),
+            mk(9, "LDAP enumeration query", "DC01", "low", JILL, "10.50.0.9"),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    ("phrase", "justified_in_scn01", "justified_in_vpn"),
+    [
+        ("Data was exfiltrated from FINDB01.", False, False),
+        ("An exfil attempt is likely.", False, False),
+        ("This looks like a data leak.", False, False),
+        ("There is a risk of data theft.", True, False),
+        ("The attacker stole data.", True, False),
+        ("Sensitive data was stolen.", True, False),
+        ("The attacker took over the account.", True, True),
+        ("This is an account takeover.", True, True),
+        ("They hijacked the account.", True, True),
+        ("The attacker stole credentials.", False, True),
+        ("Credential theft is likely.", False, True),
+        ("The attacker pivoted to the database.", True, False),
+        ("They moved laterally.", True, False),
+        ("Ransomware is likely.", False, False),
+    ],
+)
+def test_tactic_claim_paraphrases(ctx01, ctx_vpn, phrase, justified_in_scn01, justified_in_vpn):
+    for ctx, justified in ((ctx01, justified_in_scn01), (ctx_vpn, justified_in_vpn)):
+        host = "FINDB01" if ctx is ctx01 else "DC01"
+        reply = good_reply(
+            summary=f"{phrase}\nIt began on {host}.",
+            affected_assets=[host],
+            techniques=[],
+            timeline=[f"09:00 IST - activity on {host}"],
+        )
+        errors = [e for e in validate(reply, ctx).errors if " claims " in e]
+        assert (not errors) == justified, (phrase, ctx.incident_id, errors)
+
+
+def test_claim_error_names_the_missing_stage(ctx_vpn):
+    reply = good_reply(
+        summary="Potential data theft from DC01.\nIt began on DC01.",
+        affected_assets=["DC01"],
+        techniques=[],
+        timeline=["09:00 IST - activity on DC01"],
+    )
+    errors = validate(reply, ctx_vpn).errors
+    assert any(
+        "claims data theft, but the incident never reached collection or exfiltration" in e
+        for e in errors
+    ), errors
