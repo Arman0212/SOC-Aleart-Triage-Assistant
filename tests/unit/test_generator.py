@@ -179,3 +179,20 @@ def _faker(seed: int) -> Faker:
     fake = Faker("en_US")
     fake.seed_instance(seed)
     return fake
+
+
+def test_failure_facts_count_the_preceding_burst():
+    from nullpunkt.generator.common import draft, with_failure_facts
+
+    drafts = [
+        draft("Failed login", 0, "DC01", "alice"),
+        draft("Failed login", 20, "DC01", "bob"),  # another user: not counted
+        draft("Failed login", 40, "DC01", "alice"),
+        draft("Failed login", 70, "DC01", "alice"),
+        draft("Successful login after failures", 150, "DC01", "alice"),
+        draft("Account lockout", 160, "DC01", "carol"),  # no failures before it
+    ]
+    out = with_failure_facts(drafts)
+    assert dict(out[4].facts) == {"n": "2", "minutes": "2"}  # alice: 40 s and 70 s, span 110 s
+    assert out[5].facts == ()
+    assert out[:4] == drafts[:4]

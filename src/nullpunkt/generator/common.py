@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import timedelta
 from fractions import Fraction
 
@@ -29,6 +29,30 @@ class Draft:
     scenario_id: str | None = None
     category: str | None = None  # noise category
     cluster: str | None = None  # noise cluster key label
+    facts: tuple[tuple[str, str], ...] = ()  # message fields fixed by what really happened
+
+
+FAILURE_SUMMARY_RULES = ("Successful login after failures", "Account lockout")
+
+
+def with_failure_facts(drafts: list[Draft]) -> list[Draft]:
+    """Give each "Successful login after failures" / "Account lockout" draft the real number of
+    failed logins immediately before it (same user and host) and how many minutes they spanned,
+    so its message states what actually happened."""
+    out: list[Draft] = []
+    for d in drafts:
+        if d.rule.rule_name in FAILURE_SUMMARY_RULES:
+            failures: list[Draft] = []
+            for prev in reversed(out):
+                if (prev.rule.rule_name, prev.user, prev.host) != ("Failed login", d.user, d.host):
+                    break
+                failures.append(prev)
+            if failures:
+                span = d.offset - failures[-1].offset
+                minutes = max(1, -(-span // 60))
+                d = replace(d, facts=(("n", str(len(failures))), ("minutes", str(minutes))))
+        out.append(d)
+    return out
 
 
 def draft(

@@ -73,7 +73,7 @@ def test_same_seed_gives_identical_bytes(batch_dir, tmp_path):
 # when you deliberately change what the generator produces.
 GOLDEN_FAKER = "40.39.0"
 GOLDEN_SHA256 = {
-    "alerts.jsonl": "e19e69f97858bb502f4a3862dcd08f9bfd54ddf2c2fa6883dfd0ccc95032eaeb",
+    "alerts.jsonl": "729c9fb9fdcf3890fbe3b4d5e6f4728c2da268e10d01b96ff60305c88f9b082b",
     "labels.csv": "418924a43d0a8deb2df1275404fc87467dae1594a8287cdbf30b8a24e326ec9e",
     "assets.csv": "8fadc659268810f89674fa984fb1b4fe46f40d83d0ab0ea6fe29f40165ff4262",
 }
@@ -310,3 +310,31 @@ def test_generating_3000_alerts_is_fast(tmp_path):
     started = time.perf_counter()
     write_batch(generate(GeneratorConfig()), tmp_path / "perf")
     assert time.perf_counter() - started < 5
+
+
+FAILURE_COUNT = re.compile(
+    r"after (\d+) failed attempts|following (\d+) failures within (\d+) minutes"
+)
+
+
+@pytest.mark.parametrize("seed", [42, 101])
+def test_failure_summaries_state_the_real_number_of_failures(seed):
+    """ "Successful login after failures" and "Account lockout" messages state how many failed
+    logins (same user and host) came immediately before them in that burst."""
+    batch = generate(GeneratorConfig(seed=seed))
+    history = defaultdict(list)
+    checked = 0
+    for alert in batch.alerts:
+        key = (alert.user, alert.host)
+        if alert.rule_name in ("Successful login after failures", "Account lockout"):
+            burst, t, limit = 0, alert.timestamp, 360  # summary up to 6 min after the burst
+            for prev in reversed(history[key]):
+                if prev.rule_name != "Failed login" or (t - prev.timestamp).total_seconds() > limit:
+                    break
+                burst, t, limit = burst + 1, prev.timestamp, 60  # failures < 1 min apart
+            match = FAILURE_COUNT.search(alert.message)
+            assert match, alert.message
+            assert int(match.group(1) or match.group(2)) == burst, alert
+            checked += 1
+        history[key].append(alert)
+    assert checked > 50

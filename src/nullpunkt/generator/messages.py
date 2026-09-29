@@ -225,9 +225,12 @@ def template_fields(template: str) -> list[str]:
 
 def render_message(d: Draft, rng: random.Random, fake: Faker) -> str:
     template = rng.choice(TEMPLATES[d.rule.rule_name])
+    facts = dict(d.facts)
     values: dict[str, str] = {}
     for name in template_fields(template):
-        if name in _DRAFT_FIELDS:
+        if name in facts:
+            values[name] = facts[name]
+        elif name in _DRAFT_FIELDS:
             value = getattr(d, name)
             if value is None:
                 raise ValueError(f"{d.rule.rule_name!r} template needs {name} but it is empty")

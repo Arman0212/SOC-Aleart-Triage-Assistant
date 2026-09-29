@@ -12,7 +12,14 @@ import random
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
-from nullpunkt.generator.common import Clock, Draft, burst, draft, largest_remainder
+from nullpunkt.generator.common import (
+    Clock,
+    Draft,
+    burst,
+    draft,
+    largest_remainder,
+    with_failure_facts,
+)
 from nullpunkt.generator.inventory import DMZ_HOSTS, SHARED_ADMIN, Inventory, User
 
 Episode = Callable[[random.Random, int], list[Draft]]
@@ -64,7 +71,7 @@ def _typo_keys(ctx: NoiseContext) -> list[NoiseKey]:
             elif rng.random() < 0.85:
                 rule = "Successful login after failures"
                 out.append(draft(rule, times[-1], "DC01", u.user_id, src, dc_ip))
-            return out
+            return with_failure_facts(out)
 
         keys.append(NoiseKey(f"typos:{u.user_id}", (u.user_id,), episode))
     return keys

@@ -14,7 +14,7 @@ import random
 from dataclasses import dataclass, field
 
 from nullpunkt.core.detection_rules import get_rule
-from nullpunkt.generator.common import Draft
+from nullpunkt.generator.common import Draft, with_failure_facts
 from nullpunkt.generator.inventory import Inventory, User
 
 # Role kinds. Victim kinds identify entities that belong to the intrusion and are therefore kept
@@ -334,4 +334,4 @@ def run_scenario(scenario: Scenario, inv: Inventory, rng: random.Random, start: 
                 )
             )
     overlap = bindings[scenario.typo_overlap_role] if scenario.typo_overlap_role else None
-    return ScenarioRun(scenario, bindings, drafts, victims, overlap, start)
+    return ScenarioRun(scenario, bindings, with_failure_facts(drafts), victims, overlap, start)
