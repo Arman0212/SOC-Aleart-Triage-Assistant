@@ -17,6 +17,8 @@ SCENARIO_IDS = ("SCN-01", "SCN-02", "SCN-03", "SCN-04", "SCN-05", "SCN-06", "SCN
 
 
 class GeneratorConfig(BaseModel):
+    """configs/generator.yaml: seed, size, shift window, business hours and scenarios."""
+
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     seed: int = 42

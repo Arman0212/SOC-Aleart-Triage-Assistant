@@ -122,6 +122,8 @@ class BriefingConfig(_Section):
 
 
 class SiteConfig(_Section):
+    """Display settings."""
+
     timezone: str = "Asia/Kolkata"
     """Company time zone for display (briefs, UI). Must match configs/generator.yaml."""
 
@@ -136,6 +138,8 @@ class SiteConfig(_Section):
 
 
 class StorageConfig(_Section):
+    """Where the SQLite database lives."""
+
     db_path: str = "data/generated/nullpunkt.db"
     """SQLite database. ``DB_PATH`` (environment or .env) overrides it."""
 
@@ -147,6 +151,8 @@ class StudyConfig(_Section):
 
 
 class PipelineConfig(_Section):
+    """configs/pipeline.yaml: one section per concern."""
+
     site: SiteConfig = SiteConfig()
     correlation: CorrelationConfig = CorrelationConfig()
     scoring: ScoringConfig = ScoringConfig()
@@ -156,5 +162,6 @@ class PipelineConfig(_Section):
 
 
 def load_pipeline_config(path: str | Path) -> PipelineConfig:
+    """Read and validate a pipeline config (an empty file gives the defaults)."""
     data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
     return PipelineConfig.model_validate(data)

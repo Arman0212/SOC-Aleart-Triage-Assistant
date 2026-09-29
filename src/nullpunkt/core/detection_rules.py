@@ -227,6 +227,7 @@ RULES_BY_NAME: dict[str, DetectionRule] = {rule.rule_name: rule for rule in RULE
 
 
 def get_rule(rule_name: str) -> DetectionRule:
+    """The catalog entry for ``rule_name``; KeyError if the rule is unknown."""
     try:
         return RULES_BY_NAME[rule_name]
     except KeyError:

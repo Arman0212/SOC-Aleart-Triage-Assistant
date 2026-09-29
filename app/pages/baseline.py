@@ -18,6 +18,8 @@ repo = ctx.repo
 tz = batch.timezone
 
 
+# db_path is unused in the body on purpose: it is part of the cache key, so two databases never
+# share cached rows.
 @st.cache_data(show_spinner=False)
 def _rows(db_path: str, batch_id: str, tz: str) -> list[dict]:
     return alert_table(repo.raw_alerts(batch_id), tz)

@@ -22,7 +22,6 @@ from nullpunkt.generator.common import IpPool, largest_remainder
 
 HUB_HOSTS = ("DC01", "PROXY01")
 SHARED_ADMIN = "adm-it"
-SERVICE_ACCOUNTS = ("svc-backup", "svc-sql", "svc-deploy", "svc-legacy", "svc-sccm")
 
 # host, ip, type, owner, criticality
 SERVERS: tuple[tuple[str, str, AssetType, str, int], ...] = (
@@ -117,6 +116,7 @@ def _user_ids(fake: Faker, n: int) -> list[str]:
 
 
 def build_inventory(n_hosts: int, rng: random.Random, fake: Faker) -> Inventory:
+    """The organisation: the fixed servers, plus endpoints and their users across departments."""
     assets = [
         Asset(host=h, ip=ip, asset_type=t, owner=o, criticality=c) for h, ip, t, o, c in SERVERS
     ]

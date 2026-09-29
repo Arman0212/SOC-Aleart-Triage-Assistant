@@ -33,6 +33,8 @@ def _short(items: list[str], n: int = 4) -> str:
 
 
 def report(result: CorrelationResult, n_alerts: int, top: int) -> str:
+    """Text summary: incident count and size distribution, the ``top`` largest incidents with their
+    link reasons, and the hubs."""
     incidents = result.incidents
     lines = [
         f"{n_alerts} alerts -> {len(incidents)} incidents "
@@ -59,12 +61,18 @@ def report(result: CorrelationResult, n_alerts: int, top: int) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Command-line entry point: correlate one batch and print the report."""
     parser = argparse.ArgumentParser(
         prog="python -m nullpunkt.correlation", description="Correlate a batch into incidents."
     )
     parser.add_argument("--batch", required=True, type=Path, help="batch directory")
-    parser.add_argument("--config", default="configs/pipeline.yaml", type=Path)
-    parser.add_argument("--top", type=int, default=10, help="largest incidents to list")
+    parser.add_argument(
+        "--config", default="configs/pipeline.yaml", type=Path,
+        help="pipeline config (default: configs/pipeline.yaml)",
+    )  # fmt: skip
+    parser.add_argument(
+        "--top", type=int, default=10, help="largest incidents to list (default: 10)"
+    )
     args = parser.parse_args(argv)
 
     config = load_pipeline_config(args.config).correlation

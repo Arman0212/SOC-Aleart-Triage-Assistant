@@ -54,8 +54,14 @@ TOP = "INC-0055"  # rank 1 (SCN-01)
 # --- migrations --------------------------------------------------------------------------------
 
 
-def test_migrations_apply_once(tmp_path):
-    conn = connect(tmp_path / "m.db")
+@pytest.fixture
+def conn(tmp_path):
+    c = connect(tmp_path / "m.db")
+    yield c
+    c.close()
+
+
+def test_migrations_apply_once(conn):
     assert migrate(conn) == [1, 2]
     assert migrate(conn) == []
     assert current_version(conn) == 2
@@ -63,8 +69,7 @@ def test_migrations_apply_once(tmp_path):
     assert {"batches", "incidents", "decisions", "audit_log", "study_sessions"} <= tables
 
 
-def test_upgrade_applies_only_new_migrations(tmp_path):
-    conn = connect(tmp_path / "m.db")
+def test_upgrade_applies_only_new_migrations(conn):
     migrate(conn)
     extra = Migration(3, "003_add_note.sql", "ALTER TABLE batches ADD COLUMN note TEXT;")
     from nullpunkt.storage.db import bundled_migrations
@@ -75,8 +80,7 @@ def test_upgrade_applies_only_new_migrations(tmp_path):
     assert "note" in columns
 
 
-def test_failed_migration_rolls_back(tmp_path):
-    conn = connect(tmp_path / "m.db")
+def test_failed_migration_rolls_back(conn):
     migrate(conn)
     bad = Migration(3, "003_bad.sql", "CREATE TABLE t (x INT);\nNOT SQL AT ALL;")
     from nullpunkt.storage.db import bundled_migrations

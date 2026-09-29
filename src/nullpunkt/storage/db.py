@@ -19,12 +19,15 @@ MIGRATION_RE = re.compile(r"^(\d{3})_[a-z0-9_]+\.sql$")
 
 @dataclass(frozen=True)
 class Migration:
+    """One versioned SQL migration file."""
+
     version: int
     name: str
     sql: str
 
 
 def bundled_migrations() -> list[Migration]:
+    """The package's migrations in version order (versions 1..n, no gaps)."""
     folder = files("nullpunkt.storage").joinpath("migrations")
     found = []
     for entry in folder.iterdir():
@@ -52,6 +55,7 @@ def connect(path: str | Path) -> sqlite3.Connection:
 
 
 def current_version(conn: sqlite3.Connection) -> int:
+    """The newest applied migration version (0 for a new database)."""
     conn.execute(
         "CREATE TABLE IF NOT EXISTS schema_version ("
         "version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)"

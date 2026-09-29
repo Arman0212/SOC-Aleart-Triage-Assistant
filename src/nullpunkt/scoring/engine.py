@@ -61,6 +61,8 @@ class BatchContext:
 def build_context(
     alerts: list[Alert], assets: dict[str, Asset], config: ScoringConfig
 ) -> BatchContext:
+    """Batch-wide inputs to the score: rule informativeness, routine activity, IP-to-host and user-
+    to-endpoint maps."""
     n = len(alerts)
     per_rule = Counter(a.rule_name for a in alerts)
     log_n = math.log(n) if n > 1 else 0.0
@@ -130,6 +132,7 @@ def score_incident(
     context: BatchContext,
     config: ScoringConfig | None = None,
 ) -> ScoreDetail:
+    """Score one incident; the detail keeps every component for the explanation."""
     cfg = config or ScoringConfig()
     reference = load_reference()
     alerts = [alerts_by_id[a] for a in incident.alert_ids]

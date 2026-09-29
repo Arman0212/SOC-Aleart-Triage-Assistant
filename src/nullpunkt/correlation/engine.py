@@ -160,6 +160,7 @@ def _entity_stats(
 def detect_hubs(
     rows: list[_Row], assets: dict[str, Asset], cfg: CorrelationConfig
 ) -> list[HubStat]:
+    """The entities that qualify as hubs, with the reasons they qualify."""
     return [s for s in _entity_stats(rows, assets, cfg) if s.reasons]
 
 
@@ -175,6 +176,7 @@ def entity_stats(
 def run_correlation(
     alerts: list[Alert], assets: dict[str, Asset], config: CorrelationConfig | None = None
 ) -> CorrelationResult:
+    """Correlate alerts into incidents, keeping the link reasons and hub stats."""
     cfg = config or CorrelationConfig()
     alerts = sorted(alerts, key=lambda a: (a.timestamp, a.alert_id))
     rows = _entities(alerts, assets, cfg)

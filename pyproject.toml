@@ -25,6 +25,7 @@ dependencies = [
 [project.scripts]
 nullpunkt-generate = "nullpunkt.generator.cli:main"
 nullpunkt-prepare-shift = "nullpunkt.storage.prepare:main"
+nullpunkt-demo-reset = "nullpunkt.storage.demo:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.16", "pre-commit>=3.8"]

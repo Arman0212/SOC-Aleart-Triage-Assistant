@@ -11,12 +11,19 @@ from nullpunkt.generator.config import load_config
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Command-line entry point for nullpunkt-generate."""
     parser = argparse.ArgumentParser(
         prog="nullpunkt-generate", description="Generate a synthetic SOC shift batch."
     )
-    parser.add_argument("--config", default="configs/generator.yaml", help="YAML config file")
+    parser.add_argument(
+        "--config",
+        default="configs/generator.yaml",
+        help="YAML config (default: configs/generator.yaml)",
+    )
     parser.add_argument("--seed", type=int, help="override the config seed")
-    parser.add_argument("--out", required=True, help="output directory, e.g. data/generated/b1")
+    parser.add_argument(
+        "--out", required=True, help="output directory, e.g. data/generated/batch-001"
+    )
     args = parser.parse_args(argv)
 
     config = load_config(args.config, seed=args.seed)

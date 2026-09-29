@@ -23,5 +23,5 @@ jobs:
         run: ruff check .
       - name: Format
         run: ruff format --check .
-      - name: Test
-        run: pytest
+      - name: Test (with coverage)
+        run: pytest --cov=nullpunkt --cov-report=term

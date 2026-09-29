@@ -177,9 +177,10 @@ the detection definitions are in [study_protocol.md](study_protocol.md).
 
 ## Known limitations
 
-- **No authentication.** The analyst name is self-declared in the sidebar, and anyone with the
-  app can decide as anyone. That's acceptable for a single-laptop demo and study, not for
-  production.
+- **Passcode only, no per-user authentication.** The analyst name is self-declared in the
+  sidebar, and anyone with the app can decide as anyone. A hosted demo can set `DEMO_PASSCODE`
+  ([deployment.md](deployment.md#5-optional-passcode)) to keep casual visitors out; without it the
+  app is unchanged. That's acceptable for a single-laptop demo and study, not for production.
 - **SQLite with one writer.** It's fine for one or a few analysts on one machine; a shared
   deployment would need a server database behind the same `Repository` protocol.
 - **The elapsed-time label is static.** The timer shown on the incident page updates only on a

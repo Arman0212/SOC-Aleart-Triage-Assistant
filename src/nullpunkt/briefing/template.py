@@ -48,6 +48,7 @@ def _pick_timeline(rows: list[dict]) -> list[dict]:
 
 
 def template_brief(ctx: BriefContext, confidence: Confidence) -> BriefDraft:
+    """A deterministic brief built from the context alone (the fallback when the model fails)."""
     data = ctx.data
     head = data["headline"]
     zone = data["timezone"]

@@ -48,6 +48,9 @@ SCHEDULE: dict[str, list[tuple[str, str]]] = {
 
 @dataclass
 class ArmResult:
+    """One participant's result in one arm: time to detect each attack (None if missed), false
+    positives and actions."""
+
     participant: str
     arm: str
     batch_id: str
@@ -75,6 +78,8 @@ class ArmResult:
 
 @dataclass
 class StudyResult:
+    """Every scored session, the excluded ones with the reason, and the per-arm measures."""
+
     results: list[ArmResult]
     excluded: list[tuple[SessionRecord, str]] = field(default_factory=list)
 
@@ -161,6 +166,8 @@ def _scenario_of(labels: dict[str, GroundTruth]) -> dict[str, str]:
 def score_session(
     repo: SQLiteRepository, session: SessionRecord, labels: dict[str, GroundTruth]
 ) -> ArmResult:
+    """One session's result: time to detect each attack, false positives and actions, counted up to
+    its deadline."""
     scenario_of = _scenario_of(labels)
     attacks = sorted(set(scenario_of.values()))
     detections: dict[str, float | None] = dict.fromkeys(attacks)
@@ -215,6 +222,8 @@ def score_session(
 def analyse(
     repo: SQLiteRepository, labels_by_batch: dict[str, dict[str, GroundTruth]]
 ) -> StudyResult:
+    """Score every completed study session, keeping the first per participant and arm, and record
+    the exclusions."""
     result = StudyResult(results=[])
     seen: set[tuple[str, str]] = set()
     for session in repo.sessions():
@@ -271,6 +280,7 @@ def schedule_check(study: StudyResult, repo: SQLiteRepository) -> list[str]:
 
 
 def to_markdown(study: StudyResult, repo: SQLiteRepository) -> str:
+    """The results document (docs/mttt_study.md)."""
     base, tool = study.rmst("baseline"), study.rmst("tool")
     improvement = study.improvement()
     paired = study.paired()
@@ -420,6 +430,7 @@ LIMITATIONS = [
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Command-line entry point: analyse the study database and write the results document."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--db", required=True, type=Path)
     parser.add_argument(

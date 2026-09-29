@@ -28,6 +28,8 @@ LABEL = {
 
 @dataclass(frozen=True)
 class ReportItem:
+    """One incident in the handover, with the final text of its latest decision."""
+
     rank: int
     tier: str
     incident_id: str
@@ -38,6 +40,8 @@ class ReportItem:
 
 @dataclass(frozen=True)
 class Handover:
+    """Everything the handover report shows (built by ``build_handover``)."""
+
     batch: BatchInfo
     stats: ShiftStats
     items: list[ReportItem]
@@ -46,6 +50,8 @@ class Handover:
 
 
 def build_handover(repo: Repository, batch_id: str, scope: str | None = None) -> Handover:
+    """The handover for one scope (a study session, or None for work outside sessions): the shift
+    stats and the approved, edited and escalated incidents in rank order."""
     batch = repo.batch(batch_id)
     latest = latest_decisions(repo.scoped_decisions(batch_id, scope))
     items = []
@@ -99,6 +105,7 @@ def _window(h: Handover) -> str:
 
 
 def to_markdown(h: Handover) -> str:
+    """The handover as Markdown."""
     s = h.stats
     headers, values = _stats_rows(h)
     analysts = ", ".join(s.analysts) or "none yet"
@@ -158,6 +165,7 @@ pre { white-space: pre-wrap; font-family: inherit; margin: .3rem 0 0; }
 
 
 def to_html(h: Handover) -> str:
+    """The handover as a standalone HTML page with print CSS."""
     e = html.escape
     headers, values = _stats_rows(h)
     s = h.stats

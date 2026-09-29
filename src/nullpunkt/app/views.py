@@ -28,6 +28,7 @@ TACTIC_SHORT = {
 
 
 def tactic_name(shortname: str) -> str:
+    """ATT&CK display name of a tactic shortname (title-cased if unknown)."""
     try:
         return load_reference().tactic(shortname).name
     except KeyError:
@@ -35,6 +36,7 @@ def tactic_name(shortname: str) -> str:
 
 
 def tactic_chain(tactics: tuple[str, ...] | list[str]) -> str:
+    """Tactics as short tags joined by ›, for the queue."""
     return " › ".join(TACTIC_SHORT.get(t, t[:2].upper()) for t in tactics)
 
 
@@ -44,10 +46,12 @@ def risk_bar_fraction(risk: float, top_risk: float) -> float:
 
 
 def local_time(ts: datetime, tz: str, fmt: str = "%H:%M") -> str:
+    """``ts`` formatted in time zone ``tz``."""
     return ts.astimezone(ZoneInfo(tz)).strftime(fmt)
 
 
 def zone_name(ts: datetime, tz: str) -> str:
+    """Abbreviation of ``tz`` at ``ts`` (for example IST), or ``tz`` itself."""
     return ts.astimezone(ZoneInfo(tz)).tzname() or tz
 
 
@@ -103,6 +107,8 @@ def routine_lines(alerts: list, evidence_ids: set[str], tz: str) -> list[str]:
 
 
 def techniques_in_kill_chain_order(techniques: list) -> list:
+    """Techniques in kill-chain order of their tactic (unknown tactics last; first appearance kept
+    within a tactic)."""
     ref = load_reference()
 
     def position(t) -> int:

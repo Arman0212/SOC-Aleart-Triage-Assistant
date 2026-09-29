@@ -39,6 +39,8 @@ TIERS = ("P1", "P2", "P3", "P4")
 
 @dataclass(frozen=True)
 class RankedIncident:
+    """An incident with its rank, tier and full score detail."""
+
     rank: int
     tier: str
     incident: Incident  # techniques and score filled in
@@ -47,6 +49,9 @@ class RankedIncident:
 
 @dataclass
 class PipelineResult:
+    """Everything a run produced: the inputs, correlation, ATT&CK mapping, ranked incidents and
+    optional briefs."""
+
     alerts: list[Alert]
     assets: dict[str, Asset]
     correlation: CorrelationResult
@@ -171,6 +176,7 @@ def run(
 
 
 def report(result: PipelineResult, top: int = 10) -> str:
+    """Text summary of a run: counts, tiers and the top incidents."""
     n_alerts, n_inc = len(result.alerts), len(result.ranked)
     tiers = ", ".join(f"{t} {c}" for t, c in result.tier_counts().items())
     lines = [
@@ -215,13 +221,22 @@ def report(result: PipelineResult, top: int = 10) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Command-line entry point: run the pipeline on a batch and print the ranking."""
     parser = argparse.ArgumentParser(
-        prog="python -m nullpunkt.pipeline", description="Correlate, map and rank a batch."
+        prog="python -m nullpunkt.pipeline",
+        description="Correlate, map to ATT&CK and rank a batch; optionally brief the top ones.",
     )
     parser.add_argument("--batch", required=True, type=Path, help="batch directory")
-    parser.add_argument("--config", default="configs/pipeline.yaml", type=Path)
-    parser.add_argument("--top", type=int, default=10)
-    parser.add_argument("--briefs", action="store_true", help="brief the top N incidents")
+    parser.add_argument(
+        "--config", default="configs/pipeline.yaml", type=Path,
+        help="pipeline config (default: configs/pipeline.yaml)",
+    )  # fmt: skip
+    parser.add_argument(
+        "--top", type=int, default=10, help="ranked incidents to print (default: 10)"
+    )
+    parser.add_argument(
+        "--briefs", action="store_true", help="brief the top incidents with Phi (needs Ollama)"
+    )
     args = parser.parse_args(argv)
     result = run(args.batch, load_pipeline_config(args.config), briefs=args.briefs)
     print(report(result, args.top))

@@ -25,16 +25,20 @@ def first_decisions(decisions: list[DecisionRecord]) -> dict[str, DecisionRecord
 
 
 def latest_decisions(decisions: list[DecisionRecord]) -> dict[str, DecisionRecord]:
+    """incident_id -> its latest decision (decisions are ordered oldest first)."""
     return {d.incident_id: d for d in decisions}
 
 
 def mttt_seconds(decisions: list[DecisionRecord]) -> float | None:
+    """Mean triage time over each incident's first decision; None if nothing is decided."""
     firsts = first_decisions(decisions)
     return mean(d.triage_seconds for d in firsts.values()) if firsts else None
 
 
 @dataclass(frozen=True)
 class ShiftStats:
+    """Shift measures for one scope: a study session, or work outside sessions."""
+
     alerts: int
     incidents: int
     reduction_ratio: float
@@ -71,6 +75,8 @@ def shift_stats(repo: Repository, batch_id: str, scope: str | None = None) -> Sh
 
 @dataclass(frozen=True)
 class SessionMetrics:
+    """Whole-session measures for one study session."""
+
     session_id: str
     analyst: str
     batch_id: str
@@ -105,10 +111,12 @@ def session_metrics(repo: Repository, session_id: str) -> SessionMetrics:
 
 
 def all_session_metrics(repo: Repository, batch_id: str | None = None) -> list[SessionMetrics]:
+    """``session_metrics`` for every study session, optionally of one batch."""
     return [session_metrics(repo, s.session_id) for s in repo.sessions(batch_id)]
 
 
 def format_duration(seconds: float | None) -> str:
+    """Seconds as a short label ("42s", "3m 07s", "1h 05m"); "–" for None."""
     if seconds is None:
         return "–"
     seconds = int(round(seconds))

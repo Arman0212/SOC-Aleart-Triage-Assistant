@@ -35,6 +35,9 @@ def evidence_confidence(ctx: BriefContext) -> Confidence:
 
 @dataclass
 class BriefOutcome:
+    """How one brief was produced: the brief, its source, attempts, latency and any fallback
+    reason."""
+
     incident_id: str
     brief: Brief
     generated_by: BriefSource
@@ -68,6 +71,8 @@ class BriefOutcome:
 
 @dataclass
 class BriefingResult:
+    """All briefs of a run, in rank order, with the prompt version, model and total time."""
+
     outcomes: dict[str, BriefOutcome]  # incident_id -> outcome, in rank order
     prompt_version: str
     model: str

@@ -95,6 +95,8 @@ DRAFT_SCHEMA = BriefDraft.model_json_schema()
 
 @dataclass(frozen=True)
 class Validated:
+    """A validation outcome: the draft when it passed, otherwise the rejection reasons."""
+
     draft: BriefDraft | None
     errors: tuple[str, ...]
 
@@ -122,6 +124,8 @@ def _strip_annotation(asset: str) -> str:
 
 
 def check_identifiers(text: str, where: str, ctx: BriefContext) -> list[str]:
+    """Errors for identifiers in ``text`` that are not trusted facts of the incident; ``where``
+    names the field."""
     t = ctx.trusted
     errors = []
     for token in sorted(EXAMPLE_TOKENS):
@@ -153,6 +157,8 @@ def check_identifiers(text: str, where: str, ctx: BriefContext) -> list[str]:
 
 
 def validate(raw: str, ctx: BriefContext) -> Validated:
+    """Parse and check a model reply: the draft if it passes, otherwise the reasons it was
+    rejected."""
     try:
         draft = BriefDraft.model_validate(json.loads(raw))
     except (json.JSONDecodeError, ValidationError, TypeError) as exc:

@@ -11,6 +11,8 @@ COLUMNS = ("Time", "Severity", "Source", "Rule", "Host", "User", "Source IP", "D
 
 
 def alert_table(alerts: list[Alert], tz: str) -> list[dict]:
+    """The raw alerts as table rows (``COLUMNS``): most severe first, then oldest first; times in
+    ``tz``."""
     ordered = sorted(alerts, key=lambda a: (-SEVERITY_WEIGHT[a.severity], a.timestamp, a.alert_id))
     return [
         dict(

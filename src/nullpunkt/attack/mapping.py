@@ -18,6 +18,8 @@ from nullpunkt.core.schema import Alert, Incident, Technique
 
 @dataclass
 class MappingResult:
+    """ATT&CK techniques per incident, and the rules the catalog could not map."""
+
     techniques: dict[str, list[Technique]]  # incident_id -> techniques
     unmapped: dict[str, dict[str, list[str]]] = field(default_factory=dict)
     """incident_id -> {rule_name: [alert_id, ...]} for rules not in the catalog."""
@@ -57,6 +59,8 @@ def map_incident(incident: Incident, alerts_by_id: dict[str, Alert]) -> list[Tec
 
 
 def map_incidents(incidents: list[Incident], alerts_by_id: dict[str, Alert]) -> MappingResult:
+    """Map every incident to ATT&CK techniques; rules missing from the catalog are reported in
+    ``unmapped``."""
     reference = load_reference()
     result = MappingResult(techniques={}, attack_version=reference.version)
     for incident in incidents:

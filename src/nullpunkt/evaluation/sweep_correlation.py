@@ -114,11 +114,13 @@ class Candidate:
 
 
 def make_batch(seed: int) -> Batch:
+    """Generate the batch for ``seed`` in memory, keyed for evaluation."""
     b = generate(GeneratorConfig(seed=seed))
     return Batch(seed, b.alerts, {a.host: a for a in b.assets}, {g.alert_id: g for g in b.labels})
 
 
 def evaluate(batch: Batch, config: CorrelationConfig) -> Evaluation:
+    """Correlate one batch with ``config`` and measure it against the acceptance rules."""
     incidents = correlate(batch.alerts, batch.assets, config)
     metrics = correlation_metrics(incidents, batch.labels)
     by_id = {a.alert_id: a for a in batch.alerts}
@@ -147,6 +149,7 @@ def _key(params: dict) -> tuple:
 
 
 def sweep(batches: list[Batch], grid: dict[str, list] = GRID) -> list[Candidate]:
+    """Evaluate every grid point on every tuning batch, with its neighbourhood robustness."""
     candidates = []
     for values in itertools.product(*grid.values()):
         params = dict(zip(grid, values, strict=True))
@@ -197,6 +200,7 @@ def _fmt_params(p: dict) -> str:
 def markdown(
     ranked: list[Candidate], held_out: Evaluation, top: int = 15, margins: list[str] | None = None
 ) -> str:
+    """The sweep results and the held-out check as Markdown tables."""
     lines = [
         "| # | window (min) | hub share | hub users | hub fan-out | recurrence gap | routine "
         "| min completeness | min purity* | incidents (101-105) | largest | oversized OK "
@@ -238,8 +242,12 @@ def markdown(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--top", type=int, default=15, help="rows to show")
+    """Command-line entry point: run the correlation sweep and print (or write) the tables."""
+    parser = argparse.ArgumentParser(
+        prog="python -m nullpunkt.evaluation.sweep_correlation",
+        description="Tune correlation on seeds 101-105 and check the held-out seed 42.",
+    )
+    parser.add_argument("--top", type=int, default=15, help="rows to show (default: 15)")
     parser.add_argument("--markdown", type=Path, help="also write the tables to this file")
     args = parser.parse_args(argv)
 

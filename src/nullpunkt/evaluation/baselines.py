@@ -18,6 +18,3 @@ def by_severity(incidents: list[Incident], alerts_by_id: dict[str, Alert]) -> li
 def by_alert_count(incidents: list[Incident]) -> list[Incident]:
     """Biggest incidents first."""
     return sorted(incidents, key=lambda inc: (-len(inc.alert_ids), inc.first_seen, inc.incident_id))
-
-
-BASELINES = ("severity-only", "alert count")

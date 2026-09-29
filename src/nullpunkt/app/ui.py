@@ -40,15 +40,20 @@ def _repository(db_path: str) -> SQLiteRepository:
 
 
 def config() -> PipelineConfig:
+    """configs/pipeline.yaml, or the defaults when it is missing."""
     return load_pipeline_config(CONFIG_PATH) if CONFIG_PATH.is_file() else PipelineConfig()
 
 
 def repository() -> SQLiteRepository:
+    """The app's shared repository for the configured database."""
     return _repository(resolve_db_path(config().storage))
 
 
 @dataclass(frozen=True)
 class Context:
+    """What a page needs: the repository, the chosen shift, the analyst and the running study
+    session."""
+
     repo: SQLiteRepository
     batch: BatchInfo | None
     analyst: str  # the participant code while a study session runs
@@ -112,6 +117,7 @@ class _NoSession:
 
 
 def sidebar() -> Context:
+    """Render the sidebar (analyst, shift, study session) and return the page context."""
     repo = repository()
     st.markdown(CSS, unsafe_allow_html=True)
     session = active_session(repo)
@@ -204,6 +210,7 @@ def _countdown(session_id: str) -> None:
 
 
 def tier_badge(tier: str) -> str:
+    """HTML badge for a tier: its colour, with its meaning as the tooltip."""
     return (
         f"<span class='np-tier' style='background:{TIER_COLOURS[tier]}' "
         f"title='{TIER_MEANING[tier]}'>{tier}</span>"
@@ -211,14 +218,17 @@ def tier_badge(tier: str) -> str:
 
 
 def badge(text: str) -> str:
+    """HTML for a neutral badge."""
     return f"<span class='np-badge'>{text}</span>"
 
 
 def status_label(status: str) -> str:
+    """Display label for an incident status."""
     return STATUS_LABEL.get(status, status)
 
 
 def require_batch(ctx: Context) -> BatchInfo:
+    """The context's shift; without one, explain how to prepare it and stop the page."""
     if ctx.batch is None:
         st.info(
             "No prepared shift in the database yet. Run "

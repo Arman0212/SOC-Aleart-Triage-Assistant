@@ -49,6 +49,7 @@ class CorrelationMetrics:
 def correlation_metrics(
     incidents: list[Incident], labels: dict[str, GroundTruth]
 ) -> CorrelationMetrics:
+    """Scenario completeness and purity, and incident sizes, measured against the labels."""
     incident_of = {a: inc.incident_id for inc in incidents for a in inc.alert_ids}
     size = {inc.incident_id: len(inc.alert_ids) for inc in incidents}
     by_scenario: dict[str, list[str]] = {}

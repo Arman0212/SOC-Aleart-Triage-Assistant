@@ -20,6 +20,9 @@ class LLMError(Exception):
 
 
 class LLMClient(Protocol):
+    """Anything that can answer the brief prompt: ``OllamaClient`` in production, ``FakeClient`` in
+    tests."""
+
     model: str
 
     def generate(self, system: str, user: str, schema: dict) -> str:

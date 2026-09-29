@@ -18,6 +18,8 @@ DATA_OPEN, DATA_CLOSE = "<incident_data>", "</incident_data>"
 
 @dataclass(frozen=True)
 class Prompt:
+    """A versioned system prompt; its version and SHA-256 are recorded on every result."""
+
     version: str
     text: str
 
@@ -28,6 +30,7 @@ class Prompt:
 
 @cache
 def load_prompt(version: str) -> Prompt:
+    """The versioned system prompt ``prompts/brief_<version>.md``."""
     path = files("nullpunkt.briefing").joinpath(f"prompts/brief_{version}.md")
     if not path.is_file():
         raise ValueError(f"no prompt for version {version!r}")
@@ -42,6 +45,7 @@ def render_data(data: dict) -> str:
 
 
 def user_message(data: dict, errors: list[str] | None = None) -> str:
+    """The user turn: the delimited data block, plus the rejection reasons on a retry."""
     text = f"{render_data(data)}\nWrite the shift brief for {data['incident_id']} as JSON."
     if errors:
         problems = "\n".join(f"- {e}" for e in errors)

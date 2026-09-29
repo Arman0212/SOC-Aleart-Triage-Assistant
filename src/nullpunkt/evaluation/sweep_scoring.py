@@ -77,6 +77,7 @@ class Prepared:
 
 
 def prepare(seed: int) -> Prepared:
+    """Generate, correlate and baseline one seed once, so the sweep only re-scores."""
     batch = make_batch(seed)
     incidents = correlate(batch.alerts, batch.assets, CorrelationConfig())
     alerts_by_id = {a.alert_id: a for a in batch.alerts}
@@ -97,6 +98,7 @@ class Run:
 
 
 def evaluate(p: Prepared, config: ScoringConfig) -> Run:
+    """Score and rank a prepared batch with ``config`` and measure the scenario ranks."""
     context = build_context(p.alerts, p.assets, config)
     scored, routine = [], {}
     for inc in p.incidents:
@@ -167,6 +169,7 @@ def _key(params: dict) -> tuple:
 
 
 def sweep(prepared: list[Prepared], grid: dict[str, list] = GRID) -> list[Candidate]:
+    """Evaluate every grid point on every tuning seed, with its neighbourhood check."""
     candidates = []
     for values in itertools.product(*grid.values()):
         params = dict(zip(grid, values, strict=True))
@@ -206,6 +209,7 @@ def _fmt(p: dict) -> str:
 
 
 def tier_table(runs: list[tuple[str, Prepared, list[Incident]]], config: ScoringConfig) -> str:
+    """Tier counts per seed and each scenario's tier, as Markdown."""
     lines = [
         "| seed | P1 | P2 | P3 | P4 | scenario tiers |",
         "|---|---|---|---|---|---|",
@@ -227,6 +231,7 @@ def tier_table(runs: list[tuple[str, Prepared, list[Incident]]], config: Scoring
 
 
 def comparison_table(p: Prepared, ours: RankingMetrics) -> str:
+    """Scenario ranks under our score and the baselines, as Markdown."""
     orderings = {"our score": ours, **p.baselines}
     lines = [
         "| scenario | " + " | ".join(orderings) + " |",
@@ -251,6 +256,7 @@ def comparison_table(p: Prepared, ours: RankingMetrics) -> str:
 
 
 def markdown(ranked: list[Candidate], thresholds, held: Prepared, held_run: Run, top: int) -> str:
+    """The sweep results and the held-out check as Markdown tables."""
     lines = [
         "| # | stage step | tactic cap | routine hours | routine penalty | targets | "
         "neighbours OK | worst mean rank | lowest scenario | highest routine |",
@@ -269,8 +275,12 @@ def markdown(ranked: list[Candidate], thresholds, held: Prepared, held_run: Run,
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--top", type=int, default=12)
+    """Command-line entry point: run the scoring sweep and print (or write) the tables."""
+    parser = argparse.ArgumentParser(
+        prog="python -m nullpunkt.evaluation.sweep_scoring",
+        description="Tune risk scoring on seeds 101-105 and check the held-out seed 42.",
+    )
+    parser.add_argument("--top", type=int, default=12, help="rows to show (default: 12)")
     parser.add_argument("--markdown", type=Path, help="also write the tables to this file")
     args = parser.parse_args(argv)
 

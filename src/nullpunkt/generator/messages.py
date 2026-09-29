@@ -220,10 +220,13 @@ _DRAFT_FIELDS = ("host", "user", "src_ip", "dst_ip")
 
 
 def template_fields(template: str) -> list[str]:
+    """Placeholder names in a message template."""
     return [name for _, name, _, _ in string.Formatter().parse(template) if name]
 
 
 def render_message(d: Draft, rng: random.Random, fake: Faker) -> str:
+    """Fill a random template for the draft's rule: the draft's facts first, invented values
+    otherwise."""
     template = rng.choice(TEMPLATES[d.rule.rule_name])
     facts = dict(d.facts)
     values: dict[str, str] = {}

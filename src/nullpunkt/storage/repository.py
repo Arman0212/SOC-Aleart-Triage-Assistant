@@ -55,6 +55,8 @@ class DecisionError(ValueError):
 
 
 class StorageSettings(BaseSettings):
+    """``DB_PATH`` from the environment or .env."""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     db_path: str | None = None  # environment variable DB_PATH
@@ -78,6 +80,8 @@ def _iso(value: datetime) -> str:
 
 @dataclass(frozen=True)
 class BatchInfo:
+    """One prepared shift: counts, time range, time zone and how it was prepared."""
+
     batch_id: str
     prepared_at: datetime
     source_dir: str
@@ -99,6 +103,8 @@ class BatchInfo:
 
 @dataclass(frozen=True)
 class QueueRow:
+    """One incident as the queue lists it."""
+
     incident_id: str
     rank: int
     tier: str
@@ -112,6 +118,8 @@ class QueueRow:
 
 @dataclass(frozen=True)
 class DecisionRecord:
+    """A stored decision, with its triage timing and study session."""
+
     id: int
     batch_id: str
     incident_id: str
@@ -127,6 +135,8 @@ class DecisionRecord:
 
 @dataclass(frozen=True)
 class SessionRecord:
+    """A study session: participant, batch, arm, purpose and time box (ends at ``deadline``)."""
+
     session_id: str
     analyst: str  # the participant code in study sessions
     batch_id: str
@@ -156,6 +166,8 @@ class SessionRecord:
 
 @dataclass(frozen=True)
 class FlagRecord:
+    """A baseline-arm flag on one raw alert."""
+
     id: int
     session_id: str
     batch_id: str
@@ -166,6 +178,8 @@ class FlagRecord:
 
 @dataclass(frozen=True)
 class BriefRecord:
+    """A stored brief, the context it was written from, and its generation metadata."""
+
     brief: Brief
     context: dict
     meta: dict  # generated_by, path, attempts, latency_seconds, prompt_version, model, ...
@@ -191,6 +205,8 @@ class IncidentView:
 
 
 class Repository(Protocol):
+    """What the app and the study need from storage; ``SQLiteRepository`` implements it."""
+
     def save_shift(
         self,
         result: object,
@@ -262,6 +278,9 @@ class Repository(Protocol):
 
 
 class SQLiteRepository:
+    """The SQLite store: shifts, decisions with database-captured timing, study sessions, flags and
+    the append-only audit log. ``clock`` is injectable for tests."""
+
     def __init__(self, path: str | Path, clock: Clock | None = None) -> None:
         self.path = str(path)
         self.conn = connect(self.path)

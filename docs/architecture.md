@@ -4,7 +4,7 @@ Nullpunkt turns a shift's worth of alerts (about 3,000) into about 60 ranked inc
 MITRE ATT&CK techniques, an explainable risk score and a short brief that an analyst approves.
 Types are defined in [data_contract.md](data_contract.md).
 
-> **Status: Phase 7.** Built:
+> **Status: Phase 8.** Built:
 >
 > - the contract, loaders, sample batch and tests
 > - the synthetic data generator ([scenarios.md](scenarios.md))
@@ -15,7 +15,10 @@ Types are defined in [data_contract.md](data_contract.md).
 > - the before/after MTTT study tooling: study sessions with a time box, a raw alert-list
 >   baseline, and the results command ([study_protocol.md](study_protocol.md))
 >
-> The study sessions themselves, and Azure deployment (Phase 8), are next.
+> - deployment: a container image with the prepared demo shift, published from CI to GHCR and run
+>   on Azure Container Apps ([deployment.md](deployment.md))
+>
+> The study sessions themselves are next.
 
 ## Pipeline
 

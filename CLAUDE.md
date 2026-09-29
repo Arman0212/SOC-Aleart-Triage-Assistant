@@ -26,8 +26,12 @@ listed in `pyproject.toml`; use only those.
 - Phase 6 (SQLite storage, prepare-shift CLI, Streamlit analyst app, handover report) is done.
 - Phase 7 (before/after MTTT study tooling: time-boxed study sessions, raw alert-list baseline,
   per-session decision scope, results command, protocol) is done. The real sessions are still
-  to run; `docs/mttt_study.md` is written only by the results command after them.
-- Next: Phase 8, Azure deployment.
+  to run; `docs/mttt_study.md` is written only by the results command after them. The study
+  runs on tag `study-v1`: study-mode behaviour must not change (docstrings and comments only in
+  study code).
+- Phase 8 (polish and deployment: Docker image built and size-checked in CI, GHCR publishing,
+  Azure Container Apps guide, committed demo database and `nullpunkt-demo-reset`, optional
+  `DEMO_PASSCODE` gate, README, demo script, quality pass) is done.
 
 ## Architecture
 
@@ -55,8 +59,8 @@ ingestion  correlation  attack      scoring  briefing  Streamlit + storage
   - `DataFileError`, whose messages start with `path:line`
 - `evaluation/ground_truth.py`: `load_ground_truth`, the only place labels are read, and
   `write_ground_truth`, which the generator uses.
-- `core/config.py`: `PipelineConfig` for `configs/pipeline.yaml`, with one section per stage.
-  Only `correlation` exists so far.
+- `core/config.py`: `PipelineConfig` for `configs/pipeline.yaml`: `site`, `correlation`,
+  `scoring`, `briefing`, `storage` and `study`.
 - `correlation`:
   - `correlate()` / `run_correlation()` turn alerts into incidents, using role-based linking,
     data-driven hubs and recurrence.
@@ -92,7 +96,12 @@ ingestion  correlation  attack      scoring  briefing  Streamlit + storage
     Baseline sessions write append-only `flags`. Queue, incident and decision reads take
     `scope=<session_id>`, so each participant sees an untouched queue.
   - `prepare.py`: the `nullpunkt-prepare-shift` CLI
+  - `demo.py`: `nullpunkt-demo-reset` and `pristine_problems`. It restores the committed
+    `data/demo/nullpunkt-demo.db` (seed 42, Phi briefs, no analyst activity), which is rebuilt by
+    `scripts/make_demo_db.py` from the brief cache
 - `app` (logic, `src/nullpunkt/app/`):
+  - `gate.py`: the optional `DEMO_PASSCODE` prompt. It is off when the variable is unset, which
+    `tests/conftest.py` ensures for every test
   - `metrics.py`: first-decision MTTT, shift stats (per scope), `session_metrics`
   - `report.py`: handover as Markdown and HTML
   - `views.py`: presentation helpers
@@ -107,6 +116,11 @@ ingestion  correlation  attack      scoring  briefing  Streamlit + storage
   (descriptive only), and the `docs/mttt_study.md` writer. Study batches come from
   `configs/study_a.yaml` (seed 42), `configs/study_b.yaml` (seed 2026) and
   `configs/study_practice.yaml` (no attacks). See `docs/study_protocol.md`.
+- Deployment: `Dockerfile` (python:3.12.13-slim-trixie, non-root, `docker/requirements.lock`,
+  trimmed under 500 MB), `docker/entrypoint.sh` (reset, then serve), `docker/smoke_test.py`, and
+  `.github/workflows/docker.yml`, which builds and checks every push and PR and publishes `v*`
+  tags to GHCR. Docker is not installed locally, so the image is built only in CI. See
+  `docs/deployment.md`.
 - An `Incident` is enriched step by step: `techniques`, then `score`, then `brief`, then `status`.
 
 The batch format is three files plus a manifest:
@@ -161,12 +175,17 @@ streamlit run app/streamlit_app.py                                  # analyst ap
 python -m nullpunkt.evaluation.mttt_study --db data/generated/study.db \
     --batch study-A=data/generated/study-A --batch study-B=data/generated/study-B
                                    # study results -> docs/mttt_study.md (after the sessions)
+nullpunkt-demo-reset --db data/generated/demo.db                    # pristine demo shift copy
+python scripts/make_demo_db.py                                      # rebuild the committed demo DB
+pytest --cov=nullpunkt --cov-report=term                            # coverage
 python -m nullpunkt.evaluation.sweep_correlation   # re-tune correlation (~4-5 min)
 ruff check .                 # lint
 ruff format .                # format (CI runs `ruff format --check .`)
 ```
 
 Configuration comes from `.env` (copy `.env.example`): `OLLAMA_MODEL`, `OLLAMA_HOST`, `DB_PATH`.
+In deployment, the container also reads `DEMO_PASSCODE` and `DEMO_PRISTINE_DB` from its
+environment.
 
 ## Conventions
 

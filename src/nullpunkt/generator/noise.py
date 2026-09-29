@@ -462,6 +462,7 @@ def fill_category(
 def generate_noise(
     total: int, inv: Inventory, rng: random.Random, clock: Clock, typo_overlap: list[User]
 ) -> NoiseResult:
+    """``total`` benign alerts spread over the noise categories by share."""
     if total < len(CATEGORIES):
         raise ValueError(f"need at least {len(CATEGORIES)} noise alerts, got {total}")
     ctx = NoiseContext(rng, inv, typo_overlap)

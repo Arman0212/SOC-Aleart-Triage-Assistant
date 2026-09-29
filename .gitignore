@@ -220,4 +220,6 @@ __marimo__/
 # Nullpunkt
 data/generated/
 *.db
+# the committed demo database (rebuilt by scripts/make_demo_db.py)
+!data/demo/nullpunkt-demo.db
 .env

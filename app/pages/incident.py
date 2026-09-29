@@ -96,6 +96,7 @@ else:
     )
 
     def decide(action: DecisionAction, **kw) -> None:
+        """Record this analyst's decision (in the running study session, if any)."""
         try:
             repo.record_decision(
                 batch.batch_id, incident_id, ctx.analyst, action, session_id=ctx.session_id, **kw

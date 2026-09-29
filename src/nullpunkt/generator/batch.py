@@ -32,6 +32,8 @@ from nullpunkt.ingestion.loader import load_alerts, load_assets, write_alerts, w
 
 @dataclass(frozen=True)
 class Batch:
+    """A generated shift: alerts, assets and labels, with the config that made it."""
+
     config: GeneratorConfig
     alerts: list[Alert]
     assets: list[Asset]
@@ -98,6 +100,7 @@ def _count(values: Iterable[str]) -> dict[str, int]:
 
 
 def generate(config: GeneratorConfig) -> Batch:
+    """Generate a complete synthetic shift; deterministic for a seed and Faker version."""
     rng = random.Random(config.seed)
     fake = Faker("en_US")
     fake.seed_instance(config.seed)

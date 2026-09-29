@@ -63,6 +63,7 @@ def draft(
     src_ip: str | None = None,
     dst_ip: str | None = None,
 ) -> Draft:
+    """An alert for ``rule_name`` at ``offset`` seconds into the shift, before rendering."""
     return Draft(offset, get_rule(rule_name), host, user, src_ip, dst_ip)
 
 

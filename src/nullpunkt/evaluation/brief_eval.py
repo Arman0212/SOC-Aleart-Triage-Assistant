@@ -103,6 +103,8 @@ def _injection(result: PipelineResult, client: LLMClient, cfg: BriefingConfig) -
 
 
 def evaluate(client: LLMClient | None = None, cache_dir: Path | None = None) -> dict:
+    """Brief the held-out seed-42 batch with the real model and score the briefs against the labels
+    (a JSON-ready report)."""
     batch = make_batch(HELD_OUT_SEED)
     with tempfile.TemporaryDirectory() as scratch:
         cache = cache_dir or Path(scratch) / "brief_cache"
@@ -143,8 +145,15 @@ def evaluate(client: LLMClient | None = None, cache_dir: Path | None = None) -> 
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--out", type=Path, default=Path("brief_eval.json"))
+    """Command-line entry point: run the brief evaluation and write the JSON report."""
+    parser = argparse.ArgumentParser(
+        prog="python -m nullpunkt.evaluation.brief_eval",
+        description="Evaluate shift briefs on the seed-42 demo batch against the real model.",
+    )
+    parser.add_argument(
+        "--out", type=Path, default=Path("brief_eval.json"),
+        help="JSON report (default: brief_eval.json)",
+    )  # fmt: skip
     args = parser.parse_args(argv)
     report = evaluate()
     args.out.write_text(json.dumps(report, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")

@@ -24,6 +24,8 @@ DEFAULT_CONFIG = Path("configs/pipeline.yaml")
 
 @dataclass(frozen=True)
 class Prepared:
+    """The stored shift and the pipeline result it came from."""
+
     batch: BatchInfo
     result: PipelineResult
     db_path: str | None = None
@@ -38,6 +40,8 @@ def prepare_shift(
     replace: bool = False,
     batch_id: str | None = None,
 ) -> Prepared:
+    """Run the pipeline on ``batch_dir`` and store the shift (the batch ID defaults to the directory
+    name)."""
     cfg = config or PipelineConfig()
     batch_dir = Path(batch_dir)
     result = run(batch_dir, cfg, briefs=briefs, client=client)
@@ -46,10 +50,13 @@ def prepare_shift(
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Command-line entry point for nullpunkt-prepare-shift."""
     parser = argparse.ArgumentParser(
         prog="nullpunkt-prepare-shift", description="Run the pipeline and store the shift."
     )
-    parser.add_argument("--batch", required=True, type=Path, help="batch directory")
+    parser.add_argument(
+        "--batch", required=True, type=Path, help="batch directory; its name is the batch ID"
+    )
     parser.add_argument(
         "--config", type=Path, help="pipeline config (default: configs/pipeline.yaml if present)"
     )

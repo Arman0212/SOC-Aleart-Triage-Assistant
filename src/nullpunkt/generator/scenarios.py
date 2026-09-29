@@ -310,6 +310,7 @@ def bind_roles(
 
 
 def run_scenario(scenario: Scenario, inv: Inventory, rng: random.Random, start: int) -> ScenarioRun:
+    """Bind a scenario's roles to hosts and users and emit its alerts from ``start``."""
     bindings, victims = bind_roles(scenario, inv, rng)
 
     def resolve(role: str | None) -> str | None:

@@ -25,6 +25,8 @@ class TechniqueInfo:
 
 @dataclass(frozen=True)
 class AttackReference:
+    """The bundled ATT&CK subset: version, source, tactics in kill-chain order and techniques."""
+
     version: str
     source: str
     tactics: tuple[Tactic, ...]  # kill-chain order
@@ -43,6 +45,8 @@ class AttackReference:
 
 @cache
 def load_reference() -> AttackReference:
+    """The bundled Enterprise ATT&CK subset: tactics in kill-chain order and the catalog's
+    techniques."""
     raw = json.loads(
         files("nullpunkt.attack").joinpath("data/attack_subset.json").read_text(encoding="utf-8")
     )

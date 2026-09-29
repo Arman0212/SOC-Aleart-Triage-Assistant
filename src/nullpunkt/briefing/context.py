@@ -46,6 +46,9 @@ class Trusted:
 
 @dataclass(frozen=True)
 class BriefContext:
+    """One incident prepared for briefing: the JSON the model sees and the trusted facts the
+    validator checks against."""
+
     incident: Incident
     data: dict  # the JSON the model sees
     trusted: Trusted
@@ -74,6 +77,8 @@ def build_context(
     timezone: str,
     known_users: frozenset[str] = frozenset(),
 ) -> BriefContext:
+    """The compact context for briefing one ranked incident: headline, assets, users, techniques,
+    grouped evidence timeline, routine activity and playbook."""
     if incident.score is None:
         raise ValueError(f"{incident.incident_id} must be scored before it is briefed")
     tz = ZoneInfo(timezone)

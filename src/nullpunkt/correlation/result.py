@@ -65,6 +65,8 @@ class HubStat:
 
 @dataclass
 class CorrelationResult:
+    """Incidents plus their evidence: the links that built each one and the detected hubs."""
+
     incidents: list[Incident]
     links: dict[str, list[Link]]  # incident_id -> the links that built it
     hubs: list[HubStat]
