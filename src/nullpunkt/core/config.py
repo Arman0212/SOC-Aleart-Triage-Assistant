@@ -135,11 +135,17 @@ class SiteConfig(_Section):
         return v
 
 
+class StorageConfig(_Section):
+    db_path: str = "data/generated/nullpunkt.db"
+    """SQLite database. ``DB_PATH`` (environment or .env) overrides it."""
+
+
 class PipelineConfig(_Section):
     site: SiteConfig = SiteConfig()
     correlation: CorrelationConfig = CorrelationConfig()
     scoring: ScoringConfig = ScoringConfig()
     briefing: BriefingConfig = BriefingConfig()
+    storage: StorageConfig = StorageConfig()
 
 
 def load_pipeline_config(path: str | Path) -> PipelineConfig:

@@ -37,3 +37,6 @@ briefing:
   seed: 42
   num_ctx: 8192
   cache_dir: data/generated/brief_cache
+
+storage:
+  db_path: data/generated/nullpunkt.db   # overridden by DB_PATH
