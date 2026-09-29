@@ -23,7 +23,8 @@ listed in `pyproject.toml`; use only those.
 - Phase 2 (correlation) is done.
 - Phases 3–4 (ATT&CK mapping, risk scoring, the pipeline orchestrator) are done.
 - Phase 5 (AI shift briefs with Phi via Ollama, template fallback) is done.
-- `storage` and the review app are not built yet.
+- Phase 6 (SQLite storage, prepare-shift CLI, Streamlit analyst app, handover report) is done.
+- Next: Phase 7, the MTTT study.
 
 ## Architecture
 
@@ -80,7 +81,18 @@ ingestion  correlation  attack      scoring  briefing  Streamlit + storage
   (hallucination guard), `template.py` (fallback), `engine.py` (`generate_brief`, `brief_all`,
   cache, evidence-based confidence). Tests never need Ollama; the one `@pytest.mark.ollama` test
   skips without it. See `docs/briefing_evaluation.md`.
-- `storage`: not yet implemented.
+- `storage`:
+  - `db.py`: versioned SQL migrations in `storage/migrations/`
+  - `repository.py`: the `Repository` protocol and `SQLiteRepository` (shifts, decisions with
+    DB-captured `opened_at`, study sessions, append-only audit log)
+  - `prepare.py`: the `nullpunkt-prepare-shift` CLI
+- `app` (logic, `src/nullpunkt/app/`):
+  - `metrics.py`: first-decision MTTT, shift stats, `session_metrics`
+  - `report.py`: handover as Markdown and HTML
+  - `views.py`: presentation helpers
+  - `ui.py`: Streamlit helpers
+- `app/` (repo root): the Streamlit pages. Run `streamlit run app/streamlit_app.py`. They are
+  covered by the guard tests too. See `docs/analyst_app.md`.
 - An `Incident` is enriched step by step: `techniques`, then `score`, then `brief`, then `status`.
 
 The batch format is three files plus a manifest:
@@ -130,6 +142,8 @@ python -m nullpunkt.pipeline --batch data/generated/batch-001      # full rankin
 python -m nullpunkt.evaluation.sweep_scoring                       # re-tune scoring (~5 s)
 python -m nullpunkt.pipeline --batch data/generated/batch-001 --briefs   # + Phi briefs (Ollama)
 python -m nullpunkt.evaluation.brief_eval --out brief_eval.json    # brief evaluation (~7 min)
+nullpunkt-prepare-shift --batch data/generated/batch-001           # pipeline + briefs -> SQLite
+streamlit run app/streamlit_app.py                                  # analyst app
 python -m nullpunkt.evaluation.sweep_correlation   # re-tune correlation (~4-5 min)
 ruff check .                 # lint
 ruff format .                # format (CI runs `ruff format --check .`)
