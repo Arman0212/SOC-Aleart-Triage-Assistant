@@ -4,7 +4,7 @@ Nullpunkt turns a shift's worth of alerts (about 3,000) into about 60 ranked inc
 MITRE ATT&CK techniques, an explainable risk score and a short brief that an analyst approves.
 Types are defined in [data_contract.md](data_contract.md).
 
-> **Status: Phase 6.** Built:
+> **Status: Phase 7.** Built:
 >
 > - the contract, loaders, sample batch and tests
 > - the synthetic data generator ([scenarios.md](scenarios.md))
@@ -12,8 +12,10 @@ Types are defined in [data_contract.md](data_contract.md).
 >   and [briefs](#briefs-and-analyst-review)
 > - the pipeline orchestrator (`nullpunkt.pipeline`)
 > - SQLite storage and the analyst app ([analyst_app.md](analyst_app.md))
+> - the before/after MTTT study tooling: study sessions with a time box, a raw alert-list
+>   baseline, and the results command ([study_protocol.md](study_protocol.md))
 >
-> The MTTT study (Phase 7) is next.
+> The study sessions themselves, and Azure deployment (Phase 8), are next.
 
 ## Pipeline
 
@@ -216,8 +218,10 @@ stored as a `Decision`:
 - **Timing:** `opened_at` is captured in the database on first open, and `triage_seconds` feeds
   MTTT (first decisions only).
 - **Audit:** every action goes to an append-only audit log.
-- **Study sessions:** decisions made inside a study session can be analysed separately for the
-  Phase 7 study.
+- **Study sessions:** decisions made inside a study session are scoped to it, so each
+  participant starts from an untouched queue. The baseline arm flags raw alerts instead. Only
+  `evaluation.mttt_study` compares either against the labels
+  ([study_protocol.md](study_protocol.md)).
 
 See [analyst_app.md](analyst_app.md).
 

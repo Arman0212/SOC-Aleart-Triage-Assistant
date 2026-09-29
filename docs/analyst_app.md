@@ -30,9 +30,10 @@ nobody has to reset it by hand.
 | `incidents` | the full `Incident` JSON (techniques, score, brief) and the scoring detail, plus indexed rank, tier, status and risk for the queue |
 | `links`, `hubs` | the correlation link reasons ("same user, 12 min apart") and the detected hubs |
 | `briefs` | the brief, the context it was written from, and its `BriefingResult` metadata (path, attempts, latency, prompt version, model, cache hit, fallback reason, the model's own confidence, validation errors) |
-| `study_sessions` | Phase 7 study runs: session ID, analyst, batch, started_at, ended_at |
+| `study_sessions` | study runs: session ID, participant code, batch, started_at, ended_at, and (migration 002) arm, purpose, time box and end reason |
 | `openings` | when triage of an incident started, per analyst and study session |
 | `decisions` | every decision, including re-decisions, with `study_session` (NULL outside a session) |
+| `flags` | (migration 002) baseline-arm flags: session, alert, optional note, flagged_at; append-only |
 | `audit_log` | append-only: SQL triggers reject UPDATE and DELETE |
 
 **Audit events:**
@@ -40,7 +41,8 @@ nobody has to reset it by hand.
 - `shift_prepared`, `shift_replaced`
 - `incident_opened`, `incident_reopened`
 - `decision_recorded`, `decision_changed`
-- `session_started`, `session_ended`
+- `session_started`, `session_ended`, `session_timed_out`
+- `alert_flagged`
 - `report_exported`
 
 ## Pages
@@ -124,15 +126,54 @@ Tests drive all of this with an injectable clock.
   prepare-shift, before the analyst opens the queue. Their cost (about 3–6 minutes per 10 briefs
   on an M3 laptop) is reported next to MTTT, never folded into it or dropped; see
   [briefing_evaluation.md](briefing_evaluation.md).
-- **Study sessions (Phase 7).** "Start session" and "End session" in the sidebar create a
-  `study_sessions` row. Decisions made during a session carry its ID; decisions made outside any
-  session have `study_session` NULL and are left out of every study metric.
-  `nullpunkt.app.metrics.session_metrics(repo, session_id)` returns, for one session:
+- **Study sessions.** Decisions made during a session carry its ID; decisions made outside any
+  session have `study_session` NULL and are left out of every study metric (see
+  [Study mode](#study-mode)). `nullpunkt.app.metrics.session_metrics(repo, session_id)` returns,
+  for one session:
   - the total session duration (up to now if it's still running)
   - the time from session start to the first decision on each incident, which includes
     scanning the queue (needed for comparison with a spreadsheet baseline)
   - the number of decisions, and of re-decisions
   - the first-decision MTTT
+
+## Study mode
+
+The before/after study (Phase 7) runs in the same app. The protocol, the facilitator's script and
+the detection definitions are in [study_protocol.md](study_protocol.md).
+
+- **Starting a session.** Use "Start a study session" in the sidebar. It needs:
+  - a participant code: upper case, such as `P1`; real names are refused
+  - the arm: `baseline` or `tool`
+  - the batch
+  - the purpose: `study`, `practice` or `dry-run`; only `study` sessions are analysed
+  - the time box: its default is `study.time_box_minutes` in `configs/pipeline.yaml` (15)
+- **While a session runs**, the sidebar shows only the participant, arm and batch, a countdown
+  that updates every second, and "End session". Navigation shows only the arm's pages:
+  - baseline: the Alert list
+  - tool: Queue, Incident and Handover
+- **The time box.** It's enforced in the repository, not the browser. The first read or write
+  after the deadline ends the session with `ended_at` set to exactly the deadline,
+  `end_reason = timed_out`, and one `session_timed_out` audit event. No flag or decision is
+  accepted after that. A session ended with the button gets `end_reason = ended`.
+- **The Alert list (baseline arm).**
+  - A flat table of the raw alerts, sorted by severity, then time. It shows time, severity,
+    source, rule, host, user, IPs, message and alert ID. It has no incidents, grouping, scores,
+    tiers, ATT&CK or briefs; a test checks the page for all of these.
+  - Search across the text fields; filter by severity, source, host and user.
+  - Select a row to flag it, with an optional note. Flags go to the `flags` table with
+    `flagged_at = now(UTC)`. They're allowed only in a running baseline session, and they're
+    append-only.
+  - Baseline sessions can't make decisions.
+- **Per-session scope (tool arm).**
+  - Each study session sees the queue as if nothing had been decided. Statuses, "Decided", MTTT
+    and the handover are computed only from that session's decisions, so one participant's work
+    never shows up for the next one.
+  - Study decisions never change `incidents.status`; that column reflects only decisions made
+    outside sessions.
+  - Openings are scoped the same way.
+- **Results.** `python -m nullpunkt.evaluation.mttt_study` scores the sessions against the labels
+  and writes `docs/mttt_study.md`. This is the only study code that reads labels, and it lives in
+  `nullpunkt.evaluation`.
 
 ## Known limitations
 

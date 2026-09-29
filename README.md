@@ -111,6 +111,10 @@ streamlit run app/streamlit_app.py                         # queue, incident pag
 
 See [docs/analyst_app.md](docs/analyst_app.md).
 
+The before/after study compares the app with a flat alert list in time-boxed sessions. After the
+sessions, one command scores them against the labels and writes `docs/mttt_study.md`. See
+[docs/study_protocol.md](docs/study_protocol.md).
+
 | Seed-42 scenario rank | Our score | Severity-only | Alert count |
 |---|---|---|---|
 | SCN-01 phishing → finance DB (low/medium alerts only) | **1** | 51 | 52 |
@@ -130,8 +134,10 @@ assets = load_assets("data/sample/assets.csv")  # 9 hosts keyed by name
 
 ## Project status
 
-Phases 0–6 are done: foundation, synthetic data generator, correlation, ATT&CK mapping, risk
-scoring, AI shift briefs, and the analyst app with decision storage. The later phases are listed in the project plan.
+Phases 0–7 are done: foundation, synthetic data generator, correlation, ATT&CK mapping, risk
+scoring, AI shift briefs, the analyst app with decision storage, and the before/after study
+tooling. The study sessions themselves come next. The later phases are listed in the project
+plan.
 
 | Component | Status |
 |---|---|
@@ -143,7 +149,8 @@ scoring, AI shift briefs, and the analyst app with decision storage. The later p
 | AI shift briefs (Phi via Ollama, validated, template fallback) | done |
 | SQLite storage, prepare-shift CLI, Streamlit analyst app, handover report | done |
 | Evaluation: correlation and ranking metrics, baselines | done |
-| Evaluation: MTTT before vs after | not started |
+| Evaluation: MTTT before vs after (study tooling, protocol) | done |
+| Evaluation: MTTT study sessions and results | not started |
 | Azure deployment (Phase 8) | not started |
 
 ## Contributing
