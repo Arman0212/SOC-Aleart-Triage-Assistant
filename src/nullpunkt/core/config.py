@@ -1,16 +1,17 @@
 """Pipeline configuration (configs/pipeline.yaml).
 
-One section per pipeline stage: ``correlation`` and ``scoring`` so far; briefing adds its own
-section later.
+One section per concern: ``site`` (display settings) and one per pipeline stage (``correlation``,
+``scoring``, ``briefing``).
 """
 
 from __future__ import annotations
 
 from ipaddress import IPv4Network, IPv6Network
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from nullpunkt.core.schema import AssetType
 
@@ -103,9 +104,42 @@ class ScoringConfig(_Section):
         return self
 
 
+class BriefingConfig(_Section):
+    """Settings for nullpunkt.briefing. ``OLLAMA_MODEL`` and ``OLLAMA_HOST`` (environment or
+    .env) override ``model`` and ``host``."""
+
+    model: str = "phi4-mini"
+    host: str = "http://localhost:11434"
+    timeout_seconds: float = Field(default=120, gt=0)
+    top_n: int = Field(default=10, ge=0)
+    max_retries: int = Field(default=1, ge=0, le=3)
+    prompt_version: str = Field(default="v1", pattern=r"^v\d+$")
+    temperature: float = Field(default=0.0, ge=0)
+    seed: int = 42
+    num_ctx: int = Field(default=8192, ge=1024)
+    cache_dir: str | None = "data/generated/brief_cache"
+    """Where validated LLM briefs are cached; None disables the cache."""
+
+
+class SiteConfig(_Section):
+    timezone: str = "Asia/Kolkata"
+    """Company time zone for display (briefs, UI). Must match configs/generator.yaml."""
+
+    @field_validator("timezone")
+    @classmethod
+    def _known_zone(cls, v: str) -> str:
+        try:
+            ZoneInfo(v)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError(f"unknown time zone {v!r}") from exc
+        return v
+
+
 class PipelineConfig(_Section):
+    site: SiteConfig = SiteConfig()
     correlation: CorrelationConfig = CorrelationConfig()
     scoring: ScoringConfig = ScoringConfig()
+    briefing: BriefingConfig = BriefingConfig()
 
 
 def load_pipeline_config(path: str | Path) -> PipelineConfig:

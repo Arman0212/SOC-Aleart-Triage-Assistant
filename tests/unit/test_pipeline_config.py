@@ -58,7 +58,7 @@ def test_partial_section_overrides(tmp_path):
         {"correlation": {"hub_hint_types": ["printer"]}},
         {"correlation": {"internal_networks": ["not-a-network"]}},
         {"correlation": {"typo": 1}},
-        {"briefing": {}},
+        {"unknown_section": {}},
     ],
 )
 def test_invalid(bad):

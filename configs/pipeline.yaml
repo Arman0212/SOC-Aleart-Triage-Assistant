@@ -1,5 +1,8 @@
 # Pipeline settings, one section per stage. Values are the tuned defaults; see
 # docs/correlation_tuning.md for how they were chosen.
+site:
+  timezone: Asia/Kolkata   # must match company_timezone in configs/generator.yaml
+
 correlation:
   window_minutes: 150
   hub_min_share: 0.08
@@ -22,3 +25,15 @@ scoring:
   routine_penalty: 0.1
   relay_asset_types: [domain_controller, proxy, mail_server, vpn_gateway]
   tier_thresholds: [23.0, 6.2, 3.8]   # P1, P2, P3 minimum risk scores
+
+briefing:
+  model: phi4-mini            # overridden by OLLAMA_MODEL
+  host: http://localhost:11434  # overridden by OLLAMA_HOST
+  timeout_seconds: 120
+  top_n: 10
+  max_retries: 1
+  prompt_version: v1
+  temperature: 0.0
+  seed: 42
+  num_ctx: 8192
+  cache_dir: data/generated/brief_cache
