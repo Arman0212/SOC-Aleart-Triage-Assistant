@@ -13,15 +13,20 @@ refreshes and second browser tabs:
   from its "Change decision" button.
 - ``record_decision`` closes the opening: decided_at is now, triage_seconds = decided_at -
   opened_at.
+
+Decisions are scoped: each study session sees only its own decisions (statuses, "already
+decided", history), so participants never see each other's work; outside a session the app
+shows normal shift work (decisions with no session), and only that sets incidents.status.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Protocol
 
@@ -40,6 +45,9 @@ STATUS_OF_ACTION = {
     DecisionAction.ESCALATE: "escalated",
 }
 MIN_NOTE_CHARS = 3
+ARMS = ("baseline", "tool")
+PURPOSES = ("study", "practice", "dry-run")
+PARTICIPANT_RE = re.compile(r"[A-Z][A-Z0-9-]{0,9}")
 
 
 class DecisionError(ValueError):
@@ -120,14 +128,40 @@ class DecisionRecord:
 @dataclass(frozen=True)
 class SessionRecord:
     session_id: str
-    analyst: str
+    analyst: str  # the participant code in study sessions
     batch_id: str
     started_at: datetime
     ended_at: datetime | None
+    arm: str | None = None  # "baseline" or "tool" for study sessions
+    purpose: str = "study"  # "study", "practice" or "dry-run"; only "study" counts in results
+    time_box_seconds: int | None = None
+    end_reason: str | None = None  # "ended" or "timed_out"
 
     @property
     def running(self) -> bool:
         return self.ended_at is None
+
+    @property
+    def deadline(self) -> datetime | None:
+        if self.time_box_seconds is None:
+            return None
+        return self.started_at + timedelta(seconds=self.time_box_seconds)
+
+    def remaining_seconds(self, now: datetime) -> float | None:
+        if self.deadline is None:
+            return None
+        end = self.ended_at or now
+        return max(0.0, (self.deadline - min(end, self.deadline)).total_seconds())
+
+
+@dataclass(frozen=True)
+class FlagRecord:
+    id: int
+    session_id: str
+    batch_id: str
+    alert_id: str
+    note: str | None
+    flagged_at: datetime
 
 
 @dataclass(frozen=True)
@@ -173,8 +207,12 @@ class Repository(Protocol):
         batch_id: str,
         tiers: Iterable[str] | None = None,
         statuses: Iterable[str] | None = None,
+        scope: str | None = None,
     ) -> list[QueueRow]: ...
-    def incident(self, batch_id: str, incident_id: str) -> IncidentView: ...
+    def incident(
+        self, batch_id: str, incident_id: str, scope: str | None = None
+    ) -> IncidentView: ...
+    def scoped_decisions(self, batch_id: str, scope: str | None) -> list[DecisionRecord]: ...
     def open_incident(
         self, batch_id: str, incident_id: str, analyst: str, session_id: str | None = None
     ) -> datetime | None: ...
@@ -198,7 +236,18 @@ class Repository(Protocol):
     def decisions(
         self, batch_id: str | None = None, session_id: str | None = None
     ) -> list[DecisionRecord]: ...
-    def start_session(self, analyst: str, batch_id: str) -> SessionRecord: ...
+    def start_session(
+        self,
+        analyst: str,
+        batch_id: str,
+        *,
+        arm: str | None = None,
+        purpose: str = "study",
+        time_box_seconds: int | None = None,
+    ) -> SessionRecord: ...
+    def flag_alert(self, session_id: str, alert_id: str, note: str | None = None) -> FlagRecord: ...
+    def flags(self, session_id: str) -> list[FlagRecord]: ...
+    def raw_alerts(self, batch_id: str) -> list[Alert]: ...
     def end_session(self, session_id: str) -> SessionRecord: ...
     def running_session(self, analyst: str) -> SessionRecord | None: ...
     def session(self, session_id: str) -> SessionRecord: ...
@@ -446,27 +495,45 @@ class SQLiteRepository:
         batch_id: str,
         tiers: Iterable[str] | None = None,
         statuses: Iterable[str] | None = None,
+        scope: str | None = None,
     ) -> list[QueueRow]:
+        """Incidents by rank. ``scope`` is a study session: statuses then come only from that
+        session's decisions, so every participant starts from an untouched queue. Without a
+        scope, statuses come from decisions made outside any session (normal shift work)."""
         sql = (
             "SELECT incident_id, rank, tier, risk, status, asset, criticality, tactics_json, "
             "alert_count FROM incidents WHERE batch_id = ?"
         )
         args: list = [batch_id]
-        for column, values in (("tier", tiers), ("status", statuses)):
-            if values is not None:
-                values = list(values)
-                sql += f" AND {column} IN ({','.join('?' * len(values)) or 'NULL'})"
-                args += values
+        if tiers is not None:
+            tiers = list(tiers)
+            sql += f" AND tier IN ({','.join('?' * len(tiers)) or 'NULL'})"
+            args += tiers
         rows = self.conn.execute(sql + " ORDER BY rank", args).fetchall()
-        return [
-            QueueRow(
-                r["incident_id"], r["rank"], r["tier"], r["risk"], r["status"], r["asset"],
-                r["criticality"], tuple(json.loads(r["tactics_json"])), r["alert_count"],
-            )
-            for r in rows
-        ]  # fmt: skip
+        scoped = self._scoped_statuses(batch_id, scope) if scope is not None else {}
+        wanted = set(statuses) if statuses is not None else None
+        out = []
+        for r in rows:
+            status = scoped.get(r["incident_id"], "open") if scope is not None else r["status"]
+            if wanted is not None and status not in wanted:
+                continue
+            out.append(
+                QueueRow(
+                    r["incident_id"], r["rank"], r["tier"], r["risk"], status, r["asset"],
+                    r["criticality"], tuple(json.loads(r["tactics_json"])), r["alert_count"],
+                )
+            )  # fmt: skip
+        return out
 
-    def incident(self, batch_id: str, incident_id: str) -> IncidentView:
+    def _scoped_statuses(self, batch_id: str, scope: str | None) -> dict[str, str]:
+        latest = {d.incident_id: d for d in self.scoped_decisions(batch_id, scope)}
+        return {iid: STATUS_OF_ACTION[d.action] for iid, d in latest.items()}
+
+    def scoped_decisions(self, batch_id: str, scope: str | None) -> list[DecisionRecord]:
+        """Decisions in one scope: a study session, or (None) outside any session."""
+        return self._decisions("WHERE batch_id = ? AND study_session IS ?", (batch_id, scope))
+
+    def incident(self, batch_id: str, incident_id: str, scope: str | None = None) -> IncidentView:
         row = self.conn.execute(
             "SELECT * FROM incidents WHERE batch_id = ? AND incident_id = ?",
             (batch_id, incident_id),
@@ -506,17 +573,23 @@ class SQLiteRepository:
             brief = BriefRecord(
                 Brief.model_validate_json(b["brief_json"]), json.loads(b["context_json"]), meta
             )
+        status = (
+            row["status"]
+            if scope is None
+            else self._scoped_statuses(batch_id, scope).get(incident_id, "open")
+        )
         return IncidentView(
             rank=row["rank"],
             tier=row["tier"],
-            status=row["status"],
+            status=status,
             incident=Incident.model_validate_json(row["incident_json"]),
             detail=json.loads(row["detail_json"]),
             alerts=alerts,
             links=links,
             brief=brief,
             decisions=self._decisions(
-                "WHERE batch_id = ? AND incident_id = ?", (batch_id, incident_id)
+                "WHERE batch_id = ? AND incident_id = ? AND study_session IS ?",
+                (batch_id, incident_id, scope),
             ),
         )
 
@@ -555,8 +628,9 @@ class SQLiteRepository:
             if existing is not None:
                 return existing
             decided = self.conn.execute(
-                "SELECT 1 FROM decisions WHERE batch_id = ? AND incident_id = ? LIMIT 1",
-                (batch_id, incident_id),
+                "SELECT 1 FROM decisions WHERE batch_id = ? AND incident_id = ? "
+                "AND study_session IS ? LIMIT 1",
+                (batch_id, incident_id, session_id),
             ).fetchone()
             if decided:
                 return None
@@ -600,9 +674,13 @@ class SQLiteRepository:
         if action is DecisionAction.ESCALATE and len(notes or "") < MIN_NOTE_CHARS:
             raise DecisionError("escalating needs a note")
         if session_id is not None:
-            session = self.session(session_id)
+            session = self.session(session_id)  # also ends it if its time box ran out
             if not session.running:
                 raise DecisionError(f"study session {session_id} has ended")
+            if session.arm == "baseline":
+                raise DecisionError("baseline sessions flag alerts; they make no decisions")
+            if session.batch_id != batch_id:
+                raise DecisionError(f"session {session_id} is on {session.batch_id}")
         with self._tx():
             row = self.conn.execute(
                 "SELECT id, opened_at FROM openings WHERE batch_id = ? AND incident_id = ? "
@@ -623,8 +701,9 @@ class SQLiteRepository:
                 notes=notes,
             )
             previous = self.conn.execute(
-                "SELECT COUNT(*) FROM decisions WHERE batch_id = ? AND incident_id = ?",
-                (batch_id, incident_id),
+                "SELECT COUNT(*) FROM decisions WHERE batch_id = ? AND incident_id = ? "
+                "AND study_session IS ?",
+                (batch_id, incident_id, session_id),
             ).fetchone()[0]
             cur = self.conn.execute(
                 "INSERT INTO decisions (batch_id, incident_id, action, analyst, opened_at, "
@@ -638,7 +717,8 @@ class SQLiteRepository:
             self.conn.execute(
                 "UPDATE openings SET decision_id = ? WHERE id = ?", (decision_id, row["id"])
             )
-            self._refresh_status(batch_id, incident_id)
+            if session_id is None:
+                self._refresh_status(batch_id, incident_id)
             self.log(
                 analyst,
                 "decision_changed" if previous else "decision_recorded",
@@ -654,10 +734,11 @@ class SQLiteRepository:
         return self._decisions("WHERE id = ?", (decision_id,))[0]
 
     def _refresh_status(self, batch_id: str, incident_id: str) -> None:
-        """Latest decision wins (by decided_at, then id)."""
+        """incidents.status for normal shift work: the latest decision made outside any study
+        session wins (by decided_at, then id). Study sessions never change it."""
         row = self.conn.execute(
             "SELECT action FROM decisions WHERE batch_id = ? AND incident_id = ? "
-            "ORDER BY decided_at DESC, id DESC LIMIT 1",
+            "AND study_session IS NULL ORDER BY decided_at DESC, id DESC LIMIT 1",
             (batch_id, incident_id),
         ).fetchone()
         status = STATUS_OF_ACTION[DecisionAction(row["action"])] if row else "open"
@@ -704,32 +785,61 @@ class SQLiteRepository:
 
     # -- study sessions ------------------------------------------------------------------------
 
-    def start_session(self, analyst: str, batch_id: str) -> SessionRecord:
+    def start_session(
+        self,
+        analyst: str,
+        batch_id: str,
+        *,
+        arm: str | None = None,
+        purpose: str = "study",
+        time_box_seconds: int | None = None,
+    ) -> SessionRecord:
+        """Start a session. Study sessions (``arm`` set) use a participant code, never a real
+        name, as the analyst, and are time-boxed."""
         analyst = analyst.strip()
         if not analyst:
             raise DecisionError("enter your analyst name first")
+        if arm is not None:
+            if arm not in ARMS:
+                raise DecisionError(f"arm must be one of {', '.join(ARMS)}")
+            if not PARTICIPANT_RE.fullmatch(analyst):
+                raise DecisionError("use a participant code such as P3, not a name")
+            if not time_box_seconds:
+                raise DecisionError("a study session needs a time box")
+        if purpose not in PURPOSES:
+            raise DecisionError(f"purpose must be one of {', '.join(PURPOSES)}")
         self.batch(batch_id)
         with self._tx():
             if self.running_session(analyst) is not None:
-                raise DecisionError(f"{analyst} already has a running study session")
+                raise DecisionError(f"{analyst} already has a running session")
             n = self.conn.execute("SELECT COUNT(*) FROM study_sessions").fetchone()[0] + 1
             session_id = f"S{n:03d}"
             started = self.now()
             self.conn.execute(
-                "INSERT INTO study_sessions (session_id, analyst, batch_id, started_at) "
-                "VALUES (?, ?, ?, ?)",
-                (session_id, analyst, batch_id, _iso(started)),
+                "INSERT INTO study_sessions (session_id, analyst, batch_id, started_at, arm, "
+                "purpose, time_box_seconds) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (session_id, analyst, batch_id, _iso(started), arm, purpose, time_box_seconds),
             )
-            self.log(analyst, "session_started", batch_id, payload={"session_id": session_id})
+            self.log(
+                analyst,
+                "session_started",
+                batch_id,
+                payload={
+                    "session_id": session_id,
+                    "arm": arm,
+                    "purpose": purpose,
+                    "time_box_seconds": time_box_seconds,
+                },
+            )
         return self.session(session_id)
 
     def end_session(self, session_id: str) -> SessionRecord:
-        session = self.session(session_id)
+        session = self._expire(self._load_session(session_id))
         if not session.running:
             return session
         with self._tx():
             self.conn.execute(
-                "UPDATE study_sessions SET ended_at = ? WHERE session_id = ?",
+                "UPDATE study_sessions SET ended_at = ?, end_reason = 'ended' WHERE session_id = ?",
                 (_iso(self.now()), session_id),
             )
             self.log(
@@ -738,15 +848,42 @@ class SQLiteRepository:
                 session.batch_id,
                 payload={"session_id": session_id},
             )
-        return self.session(session_id)
+        return self._load_session(session_id)
+
+    def _expire(self, session: SessionRecord) -> SessionRecord:
+        """End a running session whose time box has run out, at exactly its deadline. Called on
+        every read and before every write, so the box holds even if the browser tab is closed."""
+        deadline = session.deadline
+        if not session.running or deadline is None or self.now() < deadline:
+            return session
+        with self._tx():
+            updated = self.conn.execute(
+                "UPDATE study_sessions SET ended_at = ?, end_reason = 'timed_out' "
+                "WHERE session_id = ? AND ended_at IS NULL",
+                (_iso(deadline), session.session_id),
+            ).rowcount
+            if updated:
+                self.log(
+                    session.analyst,
+                    "session_timed_out",
+                    session.batch_id,
+                    payload={"session_id": session.session_id},
+                )
+        return self._load_session(session.session_id)
 
     def running_session(self, analyst: str) -> SessionRecord | None:
         row = self.conn.execute(
             "SELECT * FROM study_sessions WHERE analyst = ? AND ended_at IS NULL", (analyst,)
         ).fetchone()
-        return self._session(row) if row else None
+        if row is None:
+            return None
+        session = self._expire(self._session(row))
+        return session if session.running else None
 
     def session(self, session_id: str) -> SessionRecord:
+        return self._expire(self._load_session(session_id))
+
+    def _load_session(self, session_id: str) -> SessionRecord:
         row = self.conn.execute(
             "SELECT * FROM study_sessions WHERE session_id = ?", (session_id,)
         ).fetchone()
@@ -755,17 +892,79 @@ class SQLiteRepository:
         return self._session(row)
 
     def sessions(self, batch_id: str | None = None) -> list[SessionRecord]:
-        sql, args = "SELECT * FROM study_sessions", ()
+        sql, args = "SELECT session_id FROM study_sessions", ()
         if batch_id:
             sql, args = sql + " WHERE batch_id = ?", (batch_id,)
-        return [self._session(r) for r in self.conn.execute(sql + " ORDER BY started_at", args)]
+        ids = [
+            r["session_id"]
+            for r in self.conn.execute(sql + " ORDER BY started_at, session_id", args)
+        ]
+        return [self.session(i) for i in ids]
 
     @staticmethod
     def _session(r: sqlite3.Row) -> SessionRecord:
         return SessionRecord(
-            r["session_id"], r["analyst"], r["batch_id"], _utc(r["started_at"]),
-            _utc(r["ended_at"]) if r["ended_at"] else None,
-        )  # fmt: skip
+            session_id=r["session_id"],
+            analyst=r["analyst"],
+            batch_id=r["batch_id"],
+            started_at=_utc(r["started_at"]),
+            ended_at=_utc(r["ended_at"]) if r["ended_at"] else None,
+            arm=r["arm"],
+            purpose=r["purpose"],
+            time_box_seconds=r["time_box_seconds"],
+            end_reason=r["end_reason"],
+        )
+
+    # -- baseline arm --------------------------------------------------------------------------
+
+    def raw_alerts(self, batch_id: str) -> list[Alert]:
+        """The shift's raw alerts and nothing derived from them (no incidents, scores, briefs)."""
+        self.batch(batch_id)
+        return [
+            Alert.model_validate_json(r["alert_json"])
+            for r in self.conn.execute(
+                "SELECT alert_json FROM alerts WHERE batch_id = ? ORDER BY timestamp, alert_id",
+                (batch_id,),
+            )
+        ]
+
+    def flag_alert(self, session_id: str, alert_id: str, note: str | None = None) -> FlagRecord:
+        session = self.session(session_id)
+        if not session.running:
+            raise DecisionError(f"session {session_id} has ended; no more flags")
+        if session.arm != "baseline":
+            raise DecisionError("flags belong to baseline sessions")
+        found = self.conn.execute(
+            "SELECT 1 FROM alerts WHERE batch_id = ? AND alert_id = ?",
+            (session.batch_id, alert_id),
+        ).fetchone()
+        if not found:
+            raise DecisionError(f"{alert_id} is not an alert of {session.batch_id}")
+        note = (note or "").strip() or None
+        with self._tx():
+            cur = self.conn.execute(
+                "INSERT INTO flags (session_id, batch_id, alert_id, note, flagged_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (session_id, session.batch_id, alert_id, note, _iso(self.now())),
+            )
+            self.log(
+                session.analyst,
+                "alert_flagged",
+                session.batch_id,
+                payload={"session_id": session_id, "alert_id": alert_id, "flag_id": cur.lastrowid},
+            )
+        return self.flags(session_id)[-1]
+
+    def flags(self, session_id: str) -> list[FlagRecord]:
+        return [
+            FlagRecord(
+                r["id"], r["session_id"], r["batch_id"], r["alert_id"], r["note"],
+                _utc(r["flagged_at"]),
+            )
+            for r in self.conn.execute(
+                "SELECT * FROM flags WHERE session_id = ? ORDER BY flagged_at, id", (session_id,)
+            )
+        ]  # fmt: skip
 
 
 class _Transaction:

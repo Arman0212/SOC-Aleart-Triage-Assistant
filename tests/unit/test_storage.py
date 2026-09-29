@@ -56,9 +56,9 @@ TOP = "INC-0055"  # rank 1 (SCN-01)
 
 def test_migrations_apply_once(tmp_path):
     conn = connect(tmp_path / "m.db")
-    assert migrate(conn) == [1]
+    assert migrate(conn) == [1, 2]
     assert migrate(conn) == []
-    assert current_version(conn) == 1
+    assert current_version(conn) == 2
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"batches", "incidents", "decisions", "audit_log", "study_sessions"} <= tables
 
@@ -66,11 +66,11 @@ def test_migrations_apply_once(tmp_path):
 def test_upgrade_applies_only_new_migrations(tmp_path):
     conn = connect(tmp_path / "m.db")
     migrate(conn)
-    extra = Migration(2, "002_add_note.sql", "ALTER TABLE batches ADD COLUMN note TEXT;")
+    extra = Migration(3, "003_add_note.sql", "ALTER TABLE batches ADD COLUMN note TEXT;")
     from nullpunkt.storage.db import bundled_migrations
 
-    assert migrate(conn, [*bundled_migrations(), extra]) == [2]
-    assert current_version(conn) == 2
+    assert migrate(conn, [*bundled_migrations(), extra]) == [3]
+    assert current_version(conn) == 3
     columns = [r[1] for r in conn.execute("PRAGMA table_info(batches)")]
     assert "note" in columns
 
@@ -78,13 +78,34 @@ def test_upgrade_applies_only_new_migrations(tmp_path):
 def test_failed_migration_rolls_back(tmp_path):
     conn = connect(tmp_path / "m.db")
     migrate(conn)
-    bad = Migration(2, "002_bad.sql", "CREATE TABLE t (x INT);\nNOT SQL AT ALL;")
+    bad = Migration(3, "003_bad.sql", "CREATE TABLE t (x INT);\nNOT SQL AT ALL;")
     from nullpunkt.storage.db import bundled_migrations
 
     with pytest.raises(sqlite3.OperationalError):
         migrate(conn, [*bundled_migrations(), bad])
-    assert current_version(conn) == 1
+    assert current_version(conn) == 2
     assert "t" not in {r[0] for r in conn.execute("SELECT name FROM sqlite_master")}
+
+
+def test_phase6_database_upgrades_in_place(tmp_path):
+    from nullpunkt.storage.db import bundled_migrations
+
+    conn = connect(tmp_path / "old.db")
+    migrate(conn, bundled_migrations()[:1])  # a Phase 6 database
+    conn.execute(
+        "INSERT INTO batches VALUES "
+        "('b', 't', 's', 1, 1, 't', 't', 'UTC', '19.2', NULL, NULL, 0, NULL, '{}')"
+    )
+    conn.execute(
+        "INSERT INTO study_sessions (session_id, analyst, batch_id, started_at) "
+        "VALUES ('S001', 'jane', 'b', '2026-10-01T09:00:00+00:00')"
+    )
+    conn.close()
+    repo = SQLiteRepository(tmp_path / "old.db")  # opening applies migration 002
+    s = repo.session("S001")
+    assert (s.purpose, s.arm, s.time_box_seconds) == ("study", None, None)
+    assert current_version(repo.conn) == 2
+    repo.close()
 
 
 def test_statement_splitter_keeps_trigger_bodies_whole():

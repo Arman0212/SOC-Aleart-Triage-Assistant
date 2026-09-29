@@ -140,12 +140,19 @@ class StorageConfig(_Section):
     """SQLite database. ``DB_PATH`` (environment or .env) overrides it."""
 
 
+class StudyConfig(_Section):
+    """The before/after study (docs/study_protocol.md)."""
+
+    time_box_minutes: float = Field(default=15, gt=0, le=120)
+
+
 class PipelineConfig(_Section):
     site: SiteConfig = SiteConfig()
     correlation: CorrelationConfig = CorrelationConfig()
     scoring: ScoringConfig = ScoringConfig()
     briefing: BriefingConfig = BriefingConfig()
     storage: StorageConfig = StorageConfig()
+    study: StudyConfig = StudyConfig()
 
 
 def load_pipeline_config(path: str | Path) -> PipelineConfig:

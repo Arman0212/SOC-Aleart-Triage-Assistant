@@ -40,3 +40,6 @@ briefing:
 
 storage:
   db_path: data/generated/nullpunkt.db   # overridden by DB_PATH
+
+study:
+  time_box_minutes: 15   # per arm; see docs/study_protocol.md
