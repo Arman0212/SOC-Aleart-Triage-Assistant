@@ -1,0 +1,11 @@
+# Study batch A (Phase 7): seed 42 with scenarios SCN-01, SCN-03, SCN-05, SCN-07.
+# Scenario sets are disjoint between study batches so nobody sees an attack type twice.
+seed: 42
+n_hosts: 80
+n_alerts: 3000
+company_timezone: Asia/Kolkata
+shift_start: "2026-10-01T09:00:00"
+shift_hours: 12
+business_start: "09:00"
+business_end: "18:00"
+scenarios: [SCN-01, SCN-03, SCN-05, SCN-07]

@@ -1,0 +1,11 @@
+# Practice batch (Phase 7): noise only, no attacks, so participants can learn both screens
+# without seeing any scenario.
+seed: 5
+n_hosts: 80
+n_alerts: 500
+company_timezone: Asia/Kolkata
+shift_start: "2026-10-01T09:00:00"
+shift_hours: 12
+business_start: "09:00"
+business_end: "18:00"
+scenarios: []

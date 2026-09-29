@@ -1,0 +1,12 @@
+# Study batch B (Phase 7): seed 2026 with scenarios SCN-02, SCN-04, SCN-06.
+# 2026 was the first seed in the pre-committed order (2026, 7, 13, 99, 314) to pass every
+# generator, correlation and scoring check; see docs/study_protocol.md.
+seed: 2026
+n_hosts: 80
+n_alerts: 3000
+company_timezone: Asia/Kolkata
+shift_start: "2026-10-01T09:00:00"
+shift_hours: 12
+business_start: "09:00"
+business_end: "18:00"
+scenarios: [SCN-02, SCN-04, SCN-06]
