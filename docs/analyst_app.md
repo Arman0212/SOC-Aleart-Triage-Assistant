@@ -77,6 +77,10 @@ nobody has to reset it by hand.
 
 - The shift stats, then only approved, edited and escalated incidents in rank order, with their
   final brief text: the analyst's edit where there is one, and the escalation note.
+- An unedited brief is printed one field per line, each with a bold label:
+  **Verdict:**, **Assets:**, **Techniques:**, **Timeline:** (a list) and **Next action:**. The
+  same layout is used in the page, the Markdown and the HTML.
+- An edited brief is the analyst's own text, printed with its line breaks kept.
 - Downloads: Markdown, and HTML with print CSS. There's no PDF dependency; use the browser's
   Print → Save as PDF.
 

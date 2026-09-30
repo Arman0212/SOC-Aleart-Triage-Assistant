@@ -390,11 +390,41 @@ def test_handover_lists_only_approved_edited_escalated_in_rank_order(repo, clock
     assert "**Escalation note:** IR <lead> & legal" in md
     assert "Analyst rewrite of the brief." in md
     assert q[1] not in md  # dismissed: counted, not listed
-    assert "Affected assets: FINDB01" in md  # final brief text for approved/escalated
+    assert "**Assets:** FINDB01" in md  # final brief text for approved/escalated
     html = to_html(h)
     assert html.startswith("<!doctype html>") and "@media print" in html
     assert "IR &lt;lead&gt; &amp; legal" in html and "<lead>" not in html
     assert [e["event"] for e in repo.audit(B)][-1] == "report_exported"
+
+
+def test_handover_puts_each_brief_field_on_its_own_line(repo, clock):
+    top = repo.queue(B)[0].incident_id
+    repo.open_incident(B, top, "jane")
+    clock.advance(30)
+    repo.record_decision(B, top, "jane", "approve")
+    item = build_handover(repo, B).items[0]
+    brief = item.brief
+    assert brief is not None
+    md = to_markdown(build_handover(repo, B))
+    lines = md.splitlines()
+    for label in ("Verdict", "Assets", "Techniques", "Timeline", "Next action"):
+        starts = [n for n, line in enumerate(lines) if line.startswith(f"**{label}:**")]
+        assert len(starts) == 1, label  # the label starts its own line, once
+        assert lines[starts[0] - 1] == "", label  # a paragraph of its own, not run together
+    timeline = lines.index("**Timeline:**")
+    entries = lines[timeline + 2 : timeline + 2 + len(brief.timeline)]
+    assert entries == [f"- {entry}" for entry in brief.timeline]  # a Markdown list
+    html = to_html(build_handover(repo, B))
+    assert "<p><strong>Assets:</strong> FINDB01" in html and "<ul><li>" in html
+
+
+def test_handover_keeps_line_breaks_of_an_edited_brief(repo, clock):
+    top = repo.queue(B)[0].incident_id
+    repo.open_incident(B, top, "jane")
+    clock.advance(30)
+    repo.record_decision(B, top, "jane", "edit", edited_brief="Line one.\nLine two.\n\nLine four.")
+    md = to_markdown(build_handover(repo, B))
+    assert "Line one.  \nLine two.\n\nLine four." in md  # hard break, then a new paragraph
 
 
 def test_handover_with_no_decisions(repo):

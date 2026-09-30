@@ -14,8 +14,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from nullpunkt.app.metrics import ShiftStats, format_duration, latest_decisions, shift_stats
-from nullpunkt.app.views import brief_as_text
-from nullpunkt.core.schema import DecisionAction
+from nullpunkt.app.views import brief_as_markdown
+from nullpunkt.core.schema import Brief, DecisionAction
 from nullpunkt.storage.repository import BatchInfo, DecisionRecord, Repository
 
 REPORTED = (DecisionAction.APPROVE, DecisionAction.EDIT, DecisionAction.ESCALATE)
@@ -35,7 +35,8 @@ class ReportItem:
     incident_id: str
     risk: float
     decision: DecisionRecord
-    brief_text: str
+    brief_text: str  # Markdown when ``brief`` is set, otherwise free text (an edit or the score)
+    brief: Brief | None = None  # the unedited brief, for structured rendering
 
 
 @dataclass(frozen=True)
@@ -60,13 +61,17 @@ def build_handover(repo: Repository, batch_id: str, scope: str | None = None) ->
         if decision is None or decision.action not in REPORTED:
             continue
         view = repo.incident(batch_id, row.incident_id, scope)
+        brief = None
         if decision.action is DecisionAction.EDIT and decision.edited_brief:
             text = decision.edited_brief
         elif view.brief is not None:
-            text = brief_as_text(view.brief.brief)
+            brief = view.brief.brief
+            text = brief_as_markdown(brief)
         else:
             text = view.incident.score.explanation if view.incident.score else ""
-        items.append(ReportItem(row.rank, row.tier, row.incident_id, row.risk, decision, text))
+        items.append(
+            ReportItem(row.rank, row.tier, row.incident_id, row.risk, decision, text, brief)
+        )
     brief_counts = repo.brief_sources(batch_id)
     repo.log("report", "report_exported", batch_id, payload={"items": len(items)})
     return Handover(batch, shift_stats(repo, batch_id, scope), items, repo.now(), brief_counts)
@@ -141,8 +146,18 @@ def to_markdown(h: Handover) -> str:
         lines += [f"### {_heading(h, item)}", ""]
         if item.decision.action is DecisionAction.ESCALATE and item.decision.notes:
             lines += [f"**Escalation note:** {item.decision.notes}", ""]
-        lines += [item.brief_text, ""]
+        lines += [item.brief_text if item.brief else _keep_line_breaks(item.brief_text), ""]
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _keep_line_breaks(text: str) -> str:
+    """Free text (an analyst's edit) as Markdown that keeps its line breaks: Markdown would
+    otherwise join consecutive lines into one paragraph."""
+    lines = text.strip().splitlines()
+    return "\n".join(
+        line.rstrip() + ("  " if line.strip() and nxt.strip() else "")
+        for line, nxt in zip(lines, [*lines[1:], ""], strict=True)
+    )
 
 
 CSS = """
@@ -159,9 +174,23 @@ th { background: #f3f4f6; } .meta { color: #4b5563; }
 .P4 { background: #6b7280; }
 .note { background: #fef3c7; padding: .4rem .6rem; border-left: 4px solid #d97706; }
 pre { white-space: pre-wrap; font-family: inherit; margin: .3rem 0 0; }
+.item p { margin: .35rem 0; } .item ul { margin: .2rem 0 .4rem; }
 .item { break-inside: avoid; }
 @media print { body { margin: 0; max-width: none; } h2 { break-after: avoid; } }
 """
+
+
+def _brief_html(brief: Brief) -> str:
+    e = html.escape
+    summary = "<br>".join(e(line.strip()) for line in brief.summary.strip().splitlines())
+    timeline = "".join(f"<li>{e(entry)}</li>" for entry in brief.timeline)
+    return (
+        f"<p><strong>Verdict:</strong> {summary}</p>"
+        f"<p><strong>Assets:</strong> {e(', '.join(brief.affected_assets))}</p>"
+        f"<p><strong>Techniques:</strong> {e(', '.join(brief.techniques))}</p>"
+        f"<p><strong>Timeline:</strong></p><ul>{timeline}</ul>"
+        f"<p><strong>Next action:</strong> {e(brief.next_action)}</p>"
+    )
 
 
 def to_html(h: Handover) -> str:
@@ -195,6 +224,7 @@ def to_html(h: Handover) -> str:
         )
         if d.action is DecisionAction.ESCALATE and d.notes:
             parts.append(f"<p class='note'><strong>Escalation note:</strong> {e(d.notes)}</p>")
-        parts.append(f"<pre>{e(item.brief_text)}</pre></div>")
+        parts.append(_brief_html(item.brief) if item.brief else f"<pre>{e(item.brief_text)}</pre>")
+        parts.append("</div>")
     parts.append("</body></html>")
     return "".join(parts)

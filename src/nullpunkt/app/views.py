@@ -66,6 +66,23 @@ def brief_as_text(brief: Brief) -> str:
     return "\n".join(lines)
 
 
+BRIEF_LABELS = ("Verdict", "Assets", "Techniques", "Timeline", "Next action")
+
+
+def brief_as_markdown(brief: Brief) -> str:
+    """The brief for the handover: each field in its own paragraph with a bold label, the
+    timeline as a list. Markdown joins single newlines, so fields are separated by blank lines."""
+    summary = "  \n".join(line.strip() for line in brief.summary.strip().splitlines())
+    parts = [
+        f"**Verdict:** {summary}",
+        f"**Assets:** {', '.join(brief.affected_assets)}",
+        f"**Techniques:** {', '.join(brief.techniques)}",
+        "**Timeline:**\n\n" + "\n".join(f"- {entry}" for entry in brief.timeline),
+        f"**Next action:** {brief.next_action}",
+    ]
+    return "\n\n".join(parts)
+
+
 def evidence_rows(alerts: list, evidence_ids: set[str], tz: str) -> list[dict]:
     """Evidence alerts in time order; consecutive alerts with the same rule, host and user are
     one row with a count."""

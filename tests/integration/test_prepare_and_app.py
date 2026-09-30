@@ -135,6 +135,8 @@ def test_opening_an_incident_starts_triage_once(db):
     text = " ".join(m.value for m in at.markdown)
     assert "INC-0055" in text and "np-verdict" in text
     assert "Why these alerts are grouped" in text and "Evidence timeline (IST)" in text
+    sc = at.metric[0]
+    assert sc.label == "S × C" and "Severity × criticality" in sc.proto.help  # short label
     at.run()  # rerun must not start a second timer
     repo = SQLiteRepository(db)
     opened = [e for e in repo.audit(B) if e["event"] == "incident_opened"]

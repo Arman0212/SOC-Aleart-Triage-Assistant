@@ -136,7 +136,15 @@ left, right = st.columns(2)
 with left:
     st.markdown("#### Score")
     s1, s2, s3, s4 = st.columns(4)
-    s1.metric("Severity × criticality", f"{score.severity_weight} × {score.asset_criticality}")
+    s1.metric(
+        "S × C",
+        f"{score.severity_weight} × {score.asset_criticality}",
+        help=(
+            "Severity × criticality: the severity weight of the riskiest alert (1 low – 4 "
+            "critical) times the criticality of the asset it hit (1–5). The risk score uses "
+            "S × C / 20."
+        ),
+    )
     s2.metric("Stage multiplier", f"{score.stage_multiplier:g}")
     s3.metric("Noise penalty", f"{score.noise_penalty:.2f}")
     s4.metric("Risk", f"{score.risk_score:.1f}")

@@ -5,6 +5,7 @@ import pytest
 from nullpunkt.app.metrics import format_duration
 from nullpunkt.app.views import (
     TIER_COLOURS,
+    brief_as_markdown,
     brief_as_text,
     evidence_rows,
     risk_bar_fraction,
@@ -83,6 +84,26 @@ def test_brief_as_text():
     assert brief_as_text(brief) == (
         "Line one.\nLine two.\n\nAffected assets: FINDB01\nTechniques: T1005\nTimeline:\n"
         "- 09:00 IST - x\nNext action: Do y."
+    )
+
+
+def test_brief_as_markdown():
+    brief = Brief(
+        summary="Line one.\nLine two.",
+        affected_assets=["FINDB01", "WS-FIN-03"],
+        techniques=["T1005"],
+        timeline=["09:00 IST - x", "09:05 IST - y"],
+        next_action="Do y.",
+        confidence="high",
+        generated_by="llm",
+        validated=True,
+    )
+    assert brief_as_markdown(brief) == (
+        "**Verdict:** Line one.  \nLine two.\n\n"
+        "**Assets:** FINDB01, WS-FIN-03\n\n"
+        "**Techniques:** T1005\n\n"
+        "**Timeline:**\n\n- 09:00 IST - x\n- 09:05 IST - y\n\n"
+        "**Next action:** Do y."
     )
 
 

@@ -105,9 +105,12 @@ the repository automatically.
 ```bash
 az login
 az account show --query "{subscription:name, id:id}" -o table   # should be Azure for Students
-az extension add --name containerapp --upgrade
 az provider register --namespace Microsoft.App --wait
 ```
+
+The `az containerapp` commands are built into current Azure CLI releases (checked with 2.90).
+Only an older CLI that says `containerapp` is not a command needs
+`az extension add --name containerapp --upgrade`.
 
 ## 4. Create the resources
 
@@ -121,35 +124,63 @@ APP=nullpunkt-demo
 IMAGE=ghcr.io/arman0212/nullpunkt:v0.8.0
 ```
 
+**Check the allowed regions before creating anything.** Student subscriptions usually carry an
+"Allowed resource deployment regions" policy:
+
+```bash
+az policy assignment list \
+  --query "[?displayName=='Allowed resource deployment regions'].parameters.listOfAllowedLocations.value" \
+  -o json
+```
+
+Pick an allowed region that also offers Container Apps (`az provider show --namespace
+Microsoft.App --query "resourceTypes[?resourceType=='managedEnvironments'].locations"`). For our
+Azure for Students subscription, the allowed list was `centralindia`, `indiasouthcentral`,
+`malaysiawest`, `koreacentral` and `uaenorth`. `centralindia` supports Container Apps and is the
+closest to India, so it's the default above. A region outside the list fails with
+`RequestDisallowedByPolicy`.
+
+Create the resource group and the environment:
+
 ```bash
 az group create --name $RG --location $LOC
 
 az containerapp env create \
   --name $ENV --resource-group $RG --location $LOC \
   --logs-destination none
+```
+
+Create the app **with the passcode gate on from the start** (step 5 explains it), so the public
+URL never exists without it. `read -s` keeps the passcode out of the screen and the shell
+history; the history only records the literal `$DEMO_PASS`:
+
+```bash
+read -s "DEMO_PASS?Passcode: " && echo    # zsh; in bash: read -s -p "Passcode: " DEMO_PASS && echo
 
 az containerapp create \
   --name $APP --resource-group $RG --environment $ENV \
   --image $IMAGE \
   --ingress external --target-port 8501 \
   --cpu 0.5 --memory 1.0Gi \
-  --min-replicas 0 --max-replicas 1
+  --min-replicas 0 --max-replicas 1 \
+  --secrets "demo-passcode=$DEMO_PASS" \
+  --env-vars DEMO_PASSCODE=secretref:demo-passcode \
+  --query properties.configuration.ingress.fqdn -o tsv
+
+unset DEMO_PASS
 ```
 
-The last command prints the app's URL. To see it again:
+To deploy without the gate, leave out `--secrets` and `--env-vars`.
+
+The command prints the app's hostname. To see it again:
 
 ```bash
 echo "https://$(az containerapp show --name $APP --resource-group $RG \
   --query properties.configuration.ingress.fqdn -o tsv)"
 ```
 
-**If a command fails with `RequestDisallowedByPolicy` or a region error,** Student subscriptions
-allow only some regions. List the allowed ones in the portal (**Policy → Assignments → Allowed
-resource deployment regions**), or try `eastus`, `westeurope` or `southeastasia`, then re-run
-from `az group create`.
-
-**The first request after idle takes about 15–30 s** while a replica starts. Pages load normally
-after that.
+**The first request after idle takes a while** while a replica starts; see
+[Operate it](#6-operate-it) for the measured time. Pages load normally after that.
 
 ## 5. Optional passcode
 
@@ -160,22 +191,30 @@ that browser session. It keeps casual visitors away from a public URL.
 - The data is synthetic, and a restart resets it.
 - Without the variable, the app behaves exactly as it does locally, including study mode.
 
-Store the passcode as a Container Apps secret, not a plain environment variable:
+The passcode is stored as a Container Apps secret, not a plain environment variable. Step 4 sets
+it at creation. To add it to an app created without it:
 
 ```bash
+read -s "DEMO_PASS?Passcode: " && echo    # zsh; in bash: read -s -p "Passcode: " DEMO_PASS && echo
 az containerapp secret set --name $APP --resource-group $RG \
-  --secrets demo-passcode='choose-a-passcode'
+  --secrets "demo-passcode=$DEMO_PASS"
+unset DEMO_PASS
 az containerapp update --name $APP --resource-group $RG \
   --set-env-vars DEMO_PASSCODE=secretref:demo-passcode
 ```
 
-- **To change the passcode:** run `secret set` again, then restart the revision (step 6).
+- **To change the passcode:** run the `read -s` and `secret set` lines again, then restart the
+  revision (step 6).
 - **To remove the gate:**
   ```bash
   az containerapp update --name $APP --resource-group $RG --remove-env-vars DEMO_PASSCODE
   ```
 
 ## 6. Operate it
+
+**Scale-to-zero.** With no requests, the replica stopped after about 6 minutes (348 s measured
+in centralindia). An open browser tab keeps its websocket connected, which also counts as
+activity.
 
 **Before a demo: keep one replica warm** so there's no cold start. Remember to undo it afterwards.
 
