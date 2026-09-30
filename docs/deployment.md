@@ -179,8 +179,9 @@ echo "https://$(az containerapp show --name $APP --resource-group $RG \
   --query properties.configuration.ingress.fqdn -o tsv)"
 ```
 
-**The first request after idle takes a while** while a replica starts; see
-[Operate it](#6-operate-it) for the measured time. Pages load normally after that.
+**The first request after idle is slower** while a replica starts (not measured). Pages load
+normally after that; to avoid the wait on demo day, keep one replica warm
+([Operate it](#6-operate-it)).
 
 ## 5. Optional passcode
 
