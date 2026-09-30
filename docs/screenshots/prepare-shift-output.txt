@@ -1,0 +1,1 @@
+prepared batch-001 into /tmp/shots-prepare.db: 3000 alerts -> 65 incidents (P1 4, P2 7, P3 9, P4 45); briefs: cached 10 in 0.0s
