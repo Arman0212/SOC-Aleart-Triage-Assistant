@@ -130,8 +130,36 @@ def test_passcode_gate_hides_everything_until_unlocked(demo_app, monkeypatch):
     assert len(at.dataframe) == 1
 
 
+def test_sign_in_hands_name_and_shift_to_the_sidebar(demo_app, monkeypatch):
+    monkeypatch.setenv("DEMO_PASSCODE", "orbit-42")
+    at = demo_app()
+    at.run()
+    at.text_input(key="gate_analyst").input("Dev")
+    at.text_input(key="passcode").input("orbit-42")
+    at.button[0].click().run()
+    assert not at.exception
+    assert at.sidebar.text_input(key="analyst").value == "Dev"
+    assert at.sidebar.selectbox(key="batch_id").value == at.session_state["batch_name"]
+
+
+def test_sign_out_locks_the_app_again(demo_app, monkeypatch):
+    monkeypatch.setenv("DEMO_PASSCODE", "orbit-42")
+    at = demo_app()
+    at.run()
+    at.text_input(key="gate_analyst").input("Dev")
+    at.text_input(key="passcode").input("orbit-42")
+    at.button[0].click().run()
+    assert len(at.dataframe) == 1
+    at.sidebar.button(key="sign_out").click().run()
+    assert not at.exception
+    assert len(at.dataframe) == 0 and len(at.sidebar.text_input) == 0
+    assert at.text_input(key="passcode").value == ""
+    assert at.text_input(key="gate_analyst").value == ""
+
+
 def test_no_passcode_prompt_when_unset(demo_app):
     at = demo_app()
     at.run()
     assert "passcode" not in at.session_state
     assert len(at.sidebar.text_input) > 0  # the normal sidebar, straight away
+    assert not [b for b in at.sidebar.button if b.key == "sign_out"]  # nothing to sign out of

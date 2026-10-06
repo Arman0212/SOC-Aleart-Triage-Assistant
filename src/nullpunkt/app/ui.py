@@ -8,6 +8,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from nullpunkt.app.gate import sign_out_button
 from nullpunkt.app.views import STATUS_LABEL, TIER_COLOURS, TIER_MEANING
 from nullpunkt.core.config import PipelineConfig, load_pipeline_config
 from nullpunkt.storage.repository import (
@@ -151,6 +152,7 @@ def sidebar() -> Context:
                 batch = next(b for b in batches if b.batch_id == chosen)
                 _start_form(repo, [b.batch_id for b in batches], chosen)
             st.caption("No login: the analyst name is self-declared.")
+            sign_out_button()
     return Context(repo, batch, analyst, session)
 
 
