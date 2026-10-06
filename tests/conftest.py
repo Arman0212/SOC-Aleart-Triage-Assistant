@@ -13,5 +13,6 @@ def sample_dir() -> Path:
 
 @pytest.fixture(autouse=True)
 def _no_demo_passcode(monkeypatch):
-    """The passcode gate is off unless a test turns it on (docs/deployment.md)."""
-    monkeypatch.delenv("DEMO_PASSCODE", raising=False)
+    """The sign-in page asks for no password unless a test sets one (docs/deployment.md). An empty
+    value, unlike an unset one, also overrides a DEMO_PASSCODE in a developer's .env."""
+    monkeypatch.setenv("DEMO_PASSCODE", "")

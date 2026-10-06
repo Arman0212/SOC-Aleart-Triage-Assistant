@@ -1,73 +1,72 @@
-"""Optional passcode for a deployed demo.
+"""Sign-in page: the app always opens on it.
 
-If ``DEMO_PASSCODE`` is set in the environment, the app shows only a sign-in page until the
-right passcode is entered in that browser session. If it is unset, the app is unchanged. This keeps
-casual visitors out of a public demo URL; it is not per-user authentication, and the analyst name
-is still self-declared.
+The analyst enters a name, which goes on every decision made in that browser session. If
+``DEMO_PASSCODE`` is set (in the environment or ``.env``), the page also asks for that shared
+password, which keeps casual visitors out of a public demo URL. Neither is per-user
+authentication: the name is self-declared and there are no accounts.
 
-The sign-in page ("Night shift") also takes the analyst name and shift, and hands them to the
-sidebar through the same session keys it keeps them in, so they are not asked for twice.
-``sign_out_button`` locks the app again and returns to that page.
+The shift is chosen in the sidebar afterwards, which opens on the first shift.
+``sign_out_button`` forgets the analyst and returns to the sign-in page.
 """
 
 from __future__ import annotations
 
 import hmac
 import json
-import os
 
 import streamlit as st
 import streamlit.components.v1 as components
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from nullpunkt.app import theme
 from nullpunkt.app.views import TIER_COLOURS
 
 PASSCODE_ENV = "DEMO_PASSCODE"
-UNLOCKED = "demo_unlocked"
+SIGNED_IN = "signed_in"
+
+
+class GateSettings(BaseSettings):
+    """The shared sign-in password: ``DEMO_PASSCODE`` from the environment (Azure sets it from a
+    Container Apps secret) or from ``.env``. The environment wins; an empty value means none."""
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    demo_passcode: str | None = None
 
 
 def required_passcode() -> str | None:
-    """The passcode the app asks for, or None when the gate is off."""
-    return os.environ.get(PASSCODE_ENV) or None
+    """The shared password the sign-in page asks for, or None when it asks only for a name."""
+    return GateSettings().demo_passcode or None
 
 
-def unlocked() -> bool:
-    """True when the gate is off or this browser session entered the right passcode."""
-    return required_passcode() is None or bool(st.session_state.get(UNLOCKED))
+def signed_in() -> bool:
+    """True once this browser session has signed in."""
+    return bool(st.session_state.get(SIGNED_IN))
 
 
+# Sign-in page only, on top of theme.CSS (fonts, colours, the ring logo).
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;800&family=JetBrains+Mono:wght@500&display=swap');
 [data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"] {
   display: none; }
-[data-testid="stAppViewContainer"] {
-  background: radial-gradient(1200px 520px at 12% 110%, rgba(59,130,246,.18), transparent 60%),
-              #0b1220; }
 .block-container { max-width: 1240px; padding-top: 3rem; }
-.np-mark { display: flex; align-items: center; gap: .6rem; font-weight: 800; font-size: 1.35rem;
-  letter-spacing: -.02em; font-family: "Schibsted Grotesk", sans-serif; color: #e6edf3; }
-.np-ring { width: 24px; height: 24px; border-radius: 50%; flex: none; position: relative;
-  background: conic-gradient(from 210deg, #e5484d, #f5a524, #22d3ee, #3b82f6, #e5484d); }
-.np-ring::after { content: ""; position: absolute; inset: 4px; border-radius: 50%;
-  background: #131c2e; }
-.np-live { font-family: "JetBrains Mono", monospace; font-size: .72rem; letter-spacing: .08em;
-  text-transform: uppercase; color: #8a97ad; display: flex; align-items: center; gap: .5rem; }
+.np-live { font-family: var(--np-mono); font-size: .72rem; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--np-muted); display: flex; align-items: center;
+  gap: .5rem; }
 .np-live i { width: 8px; height: 8px; border-radius: 50%; background: #e5484d;
   box-shadow: 0 0 0 4px rgba(229,72,77,.2); }
-.np-title { font-family: "Schibsted Grotesk", sans-serif; font-size: 1.85rem; font-weight: 700;
-  letter-spacing: -.03em; margin: .5rem 0 .2rem; color: #e6edf3; line-height: 1.15; }
-.np-sub { color: #8a97ad; font-size: .92rem; margin: 0 0 .4rem; }
-[data-testid="stForm"] { background: rgba(19,28,46,.82); border: 1px solid #22304a;
+.np-title { font-family: var(--np-display); font-size: 1.85rem; font-weight: 700;
+  letter-spacing: -.03em; margin: .5rem 0 .2rem; color: var(--np-text); line-height: 1.15; }
+.np-sub { color: var(--np-muted); font-size: .92rem; margin: 0 0 .4rem; }
+[data-testid="stForm"] { background: var(--np-panel); border: 1px solid var(--np-line);
   border-radius: 24px; padding: 1.8rem 1.7rem 1.2rem; backdrop-filter: blur(10px); }
-[data-testid="stForm"] [data-testid="stTextInputRootElement"],
-[data-testid="stForm"] [data-testid="stSelectbox"] [data-baseweb="select"] > div {
-  border-radius: 999px; background: #0b1220; border: 1px solid #22304a; min-height: 3rem;
+[data-testid="stForm"] [data-testid="stTextInputRootElement"] { border-radius: 999px;
+  background: var(--np-bg); border: 1px solid var(--np-line); min-height: 3rem;
   padding-left: .6rem; }
 [data-testid="stForm"] [data-testid="stTextInputRootElement"]:focus-within {
-  border-color: #3b82f6; }
+  border-color: var(--np-accent); }
 [data-testid="stFormSubmitButton"] button { height: 3.2rem; border: 0; margin-top: .4rem;
-  border-radius: 999px; font-weight: 700; color: #0b1220;
-  background: linear-gradient(100deg, #e5484d 0%, #f5a524 100%); }
+  border-radius: 999px; font-weight: 700; color: #0b1220; background: var(--np-grad); }
 [data-testid="stFormSubmitButton"] button:hover { filter: brightness(1.08); color: #0b1220; }
 [data-testid="stFormSubmitButton"] button p { font-size: 1rem; font-weight: 700; }
 </style>
@@ -154,34 +153,32 @@ def _hero(stats: list[tuple[str, str]]) -> str:
 
 
 def sign_out_button() -> None:
-    """A sidebar button that locks the app again and forgets the analyst; only while the gate is
-    on, since without a passcode there is nothing to sign out of."""
-    if required_passcode() is None:
-        return
+    """A sidebar button that forgets the analyst and returns to the sign-in page."""
     if st.button("Sign out", key="sign_out", icon=":material/logout:", width="stretch"):
-        for key in (UNLOCKED, "analyst_name", "analyst", "passcode", "gate_analyst"):
+        for key in (SIGNED_IN, "analyst_name", "passcode", "gate_analyst"):
             st.session_state.pop(key, None)
         st.rerun()
 
 
-def passcode_page() -> None:
-    """The only page while the app is locked."""
+def sign_in_page() -> None:
+    """The only page until this browser session signs in."""
     # Imported here because ui imports this module for the sign-out button.
     from nullpunkt.app.ui import repository
 
-    st.markdown(CSS, unsafe_allow_html=True)
+    st.markdown(theme.CSS + CSS, unsafe_allow_html=True)
     repo = repository()
     batches = repo.batches()
-    ids = [b.batch_id for b in batches]
+    # The shift the sidebar will open on: the one kept from before sign-out, else the first.
     kept = st.session_state.get("batch_name")
+    shown = next((b for b in batches if b.batch_id == kept), batches[0] if batches else None)
+    expected = required_passcode()
 
     hero, form = st.columns([1.15, 0.85], gap="large")
     with form:
-        with st.form("passcode_form"):
-            live = f"Shift {ids[0]} is live" if ids else "Nullpunkt analyst console"
+        with st.form("sign_in_form"):
+            live = f"Shift {shown.batch_id} is live" if shown else "Nullpunkt analyst console"
             st.markdown(
-                '<div class="np-mark"><span class="np-ring"></span>Nullpunkt</div>'
-                f'<div class="np-live" style="margin-top:1.1rem"><i></i>{live}</div>'
+                theme.MARK + f'<div class="np-live" style="margin-top:1.1rem"><i></i>{live}</div>'
                 '<p class="np-title">Sign in to triage</p>'
                 '<p class="np-sub">Your name goes on every decision you make.</p>',
                 unsafe_allow_html=True,
@@ -192,26 +189,28 @@ def passcode_page() -> None:
                 key="gate_analyst",
                 placeholder="your name",
             )
-            chosen = None
-            if ids:
-                chosen = st.selectbox(
-                    "Shift", ids, index=ids.index(kept) if kept in ids else 0, key="gate_batch"
-                )
-            entered = st.text_input("Passcode", type="password", key="passcode")
+            entered = ""
+            if expected is not None:
+                entered = st.text_input("Password", type="password", key="passcode")
             submitted = st.form_submit_button("Start shift", width="stretch")
-            st.caption("The passcode comes from your shift lead.")
-        expected = required_passcode()
-        if submitted and expected is not None:
-            if hmac.compare_digest(entered.encode("utf-8"), expected.encode("utf-8")):
-                st.session_state[UNLOCKED] = True
+            st.caption(
+                "The password comes from your shift lead."
+                if expected is not None
+                else "No accounts: your name is self-declared."
+            )
+        if submitted:
+            if expected is not None and not hmac.compare_digest(
+                entered.encode("utf-8"), expected.encode("utf-8")
+            ):
+                st.error("Wrong password. Check it with your shift lead and try again.")
+            elif not name.strip():
+                st.error("Enter your name to start the shift.")
+            else:
+                st.session_state[SIGNED_IN] = True
                 st.session_state["analyst_name"] = name.strip()
-                if chosen is not None:
-                    st.session_state["batch_name"] = chosen
                 st.rerun()
-            st.error("Wrong passcode. Check it with your shift lead and try again.")
 
     with hero:
-        shown = next((b for b in batches if b.batch_id == (chosen or kept)), None)
         stats = []
         if shown is not None:
             p1 = len(repo.queue(shown.batch_id, tiers=["P1"]))

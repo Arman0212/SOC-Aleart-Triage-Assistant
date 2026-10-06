@@ -185,12 +185,15 @@ normally after that; to avoid the wait on demo day, keep one replica warm
 
 ## 5. Optional passcode
 
-If `DEMO_PASSCODE` is set, the app shows only a passcode prompt until the right code is entered in
-that browser session. It keeps casual visitors away from a public URL.
+The app always opens on a sign-in page that asks for the analyst name. If `DEMO_PASSCODE` is set,
+that page also asks for this shared password (its field is labelled **Password**), and nothing else
+is shown until the right one is entered in that browser session. It keeps casual visitors away
+from a public URL. **Sign out** in the sidebar returns to the sign-in page.
 
 - It is **not** per-user authentication; the analyst name is still self-declared.
 - The data is synthetic, and a restart resets it.
-- Without the variable, the app behaves exactly as it does locally, including study mode.
+- Without the variable, the sign-in page asks only for a name, including in study mode.
+- Locally, set it in `.env` (`DEMO_PASSCODE=...`); a variable in the environment takes precedence.
 
 The passcode is stored as a Container Apps secret, not a plain environment variable. Step 4 sets
 it at creation. To add it to an app created without it:

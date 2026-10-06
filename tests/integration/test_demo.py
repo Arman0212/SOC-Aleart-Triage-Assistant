@@ -1,4 +1,5 @@
-"""The committed demo database, nullpunkt-demo-reset and the optional passcode gate."""
+"""The committed demo database, nullpunkt-demo-reset and the sign-in page (name, plus the optional
+passcode)."""
 
 import sqlite3
 from pathlib import Path
@@ -103,63 +104,79 @@ def demo_app(tmp_path, monkeypatch):
     return lambda: AppTest.from_file(APP, default_timeout=60)
 
 
+def sign_in(at: AppTest, name: str = "Dev", passcode: str | None = None) -> AppTest:
+    """Fill in and submit the sign-in form."""
+    at.text_input(key="gate_analyst").input(name)
+    if passcode is not None:
+        at.text_input(key="passcode").input(passcode)
+    return at.button[0].click().run()
+
+
 def test_demo_db_serves_the_queue(demo_app):
     at = demo_app()
     at.run()
+    sign_in(at)
     assert not at.exception
     table = at.dataframe[0].value
     assert len(table) == 65 and table["Incident"].iloc[0] == "INC-0055"
 
 
-def test_passcode_gate_hides_everything_until_unlocked(demo_app, monkeypatch):
+def test_sign_in_without_a_passcode_asks_only_for_a_name(demo_app):
+    at = demo_app()
+    at.run()
+    assert not at.exception
+    assert len(at.dataframe) == 0 and len(at.metric) == 0  # sign-in first, always
+    assert [t.key for t in at.text_input] == ["gate_analyst"]  # no passcode field
+    at.button[0].click().run()
+    assert any("Enter your name" in e.value for e in at.error)
+    assert len(at.dataframe) == 0
+
+    sign_in(at, "  Dev  ")
+    assert not at.exception and len(at.dataframe) == 1
+    assert any(m.value == "Signed in as **Dev**" for m in at.sidebar.markdown)
+    assert "analyst" not in [t.key for t in at.sidebar.text_input]  # no name box in the sidebar
+
+
+def test_passcode_hides_everything_until_entered(demo_app, monkeypatch):
     monkeypatch.setenv("DEMO_PASSCODE", "orbit-42")
     at = demo_app()
     at.run()
     assert not at.exception
     assert len(at.dataframe) == 0 and len(at.metric) == 0 and len(at.sidebar.text_input) == 0
-    at.text_input(key="passcode").input("wrong")
-    at.button[0].click().run()
-    assert any("Wrong passcode" in e.value for e in at.error)
+    assert at.text_input(key="passcode").label == "Password"
+    sign_in(at, passcode="wrong")
+    assert any("Wrong password" in e.value for e in at.error)
     assert len(at.dataframe) == 0
 
-    at.text_input(key="passcode").input("orbit-42")
-    at.button[0].click().run()
+    sign_in(at, passcode="orbit-42")
     assert not at.exception
     assert at.dataframe[0].value["Incident"].iloc[0] == "INC-0055"
-    at.run()  # stays unlocked on later reruns
+    at.run()  # stays signed in on later reruns
     assert len(at.dataframe) == 1
 
 
-def test_sign_in_hands_name_and_shift_to_the_sidebar(demo_app, monkeypatch):
+def test_sign_in_hands_the_name_to_the_sidebar(demo_app, monkeypatch):
     monkeypatch.setenv("DEMO_PASSCODE", "orbit-42")
     at = demo_app()
     at.run()
-    at.text_input(key="gate_analyst").input("Dev")
-    at.text_input(key="passcode").input("orbit-42")
-    at.button[0].click().run()
+    assert len(at.selectbox) == 0  # no shift choice on the sign-in page; the sidebar has it
+    sign_in(at, passcode="orbit-42")
     assert not at.exception
-    assert at.sidebar.text_input(key="analyst").value == "Dev"
-    assert at.sidebar.selectbox(key="batch_id").value == at.session_state["batch_name"]
+    assert any(m.value == "Signed in as **Dev**" for m in at.sidebar.markdown)
+    assert at.sidebar.selectbox(key="batch_id").value == "batch-042"  # the first shift
 
 
-def test_sign_out_locks_the_app_again(demo_app, monkeypatch):
-    monkeypatch.setenv("DEMO_PASSCODE", "orbit-42")
+@pytest.mark.parametrize("passcode", [None, "orbit-42"])
+def test_sign_out_returns_to_the_sign_in_page(demo_app, monkeypatch, passcode):
+    if passcode:
+        monkeypatch.setenv("DEMO_PASSCODE", passcode)
     at = demo_app()
     at.run()
-    at.text_input(key="gate_analyst").input("Dev")
-    at.text_input(key="passcode").input("orbit-42")
-    at.button[0].click().run()
+    sign_in(at, passcode=passcode)
     assert len(at.dataframe) == 1
     at.sidebar.button(key="sign_out").click().run()
     assert not at.exception
-    assert len(at.dataframe) == 0 and len(at.sidebar.text_input) == 0
-    assert at.text_input(key="passcode").value == ""
+    assert len(at.dataframe) == 0 and len(at.sidebar.button) == 0
     assert at.text_input(key="gate_analyst").value == ""
-
-
-def test_no_passcode_prompt_when_unset(demo_app):
-    at = demo_app()
-    at.run()
-    assert "passcode" not in at.session_state
-    assert len(at.sidebar.text_input) > 0  # the normal sidebar, straight away
-    assert not [b for b in at.sidebar.button if b.key == "sign_out"]  # nothing to sign out of
+    if passcode:
+        assert at.text_input(key="passcode").value == ""

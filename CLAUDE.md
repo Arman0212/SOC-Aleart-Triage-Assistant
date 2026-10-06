@@ -100,8 +100,11 @@ ingestion  correlation  attack      scoring  briefing  Streamlit + storage
     `data/demo/nullpunkt-demo.db` (seed 42, Phi briefs, no analyst activity), which is rebuilt by
     `scripts/make_demo_db.py` from the brief cache
 - `app` (logic, `src/nullpunkt/app/`):
-  - `gate.py`: the optional `DEMO_PASSCODE` prompt. It is off when the variable is unset, which
-    `tests/conftest.py` ensures for every test
+  - `gate.py`: the sign-in page the app always opens on (analyst name, plus the `DEMO_PASSCODE`
+    passcode when set) and the sidebar Sign out button. `tests/conftest.py` unsets
+    `DEMO_PASSCODE` for every test; tests that are not about sign-in pre-set `SIGNED_IN`
+  - `theme.py`: the shared CSS (fonts, ring logo, rounded inputs and cards, gradient primary
+    buttons) for the sign-in page and every other page
   - `metrics.py`: first-decision MTTT, shift stats (per scope), `session_metrics`
   - `report.py`: handover as Markdown and HTML
   - `views.py`: presentation helpers
@@ -183,9 +186,9 @@ ruff check .                 # lint
 ruff format .                # format (CI runs `ruff format --check .`)
 ```
 
-Configuration comes from `.env` (copy `.env.example`): `OLLAMA_MODEL`, `OLLAMA_HOST`, `DB_PATH`.
-In deployment, the container also reads `DEMO_PASSCODE` and `DEMO_PRISTINE_DB` from its
-environment.
+Configuration comes from `.env` (copy `.env.example`): `OLLAMA_MODEL`, `OLLAMA_HOST`, `DB_PATH`,
+and `DEMO_PASSCODE` (the shared sign-in password; unset means name only). In deployment, the
+container reads `DEMO_PASSCODE` and `DEMO_PRISTINE_DB` from its environment.
 
 ## Conventions
 

@@ -133,7 +133,7 @@ nullpunkt-demo-reset --db data/generated/demo.db          # a fresh copy of the 
 DB_PATH=data/generated/demo.db streamlit run app/streamlit_app.py
 ```
 
-Open the Queue and click **INC-0055** (P1). Type a name in the sidebar to make decisions. Run
+Sign in with your name, then open the Queue and click **INC-0055** (P1) to make a decision. Run
 `nullpunkt-demo-reset` again to start over; stop the app first.
 
 **From scratch, with live briefs.** This needs [Ollama](https://ollama.com) and
@@ -209,7 +209,7 @@ python -m nullpunkt.evaluation.mttt_study --help     # study results (after the 
 | `OLLAMA_MODEL` | `phi4-mini` | Phi model used for briefs |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server |
 | `DB_PATH` | `data/generated/nullpunkt.db` | SQLite database |
-| `DEMO_PASSCODE` | unset | if set, the app asks for this passcode first (deployment) |
+| `DEMO_PASSCODE` | unset | shared password: if set, the sign-in page also asks for it |
 
 ## Quality
 
@@ -224,9 +224,9 @@ python -m nullpunkt.evaluation.mttt_study --help     # study results (after the 
 
 ## Known gaps
 
-- **Passcode only, no per-user authentication.** `DEMO_PASSCODE` keeps casual visitors out of the
-  hosted demo, but the analyst name is self-declared and anyone past the passcode can decide as
-  anyone.
+- **No per-user authentication.** The name on the sign-in page is self-declared (there are no
+  accounts), and `DEMO_PASSCODE` only keeps casual visitors out of the hosted demo, so anyone past
+  it can decide as anyone.
 - **Synthetic data only.** Tuning and testing use shifts from our own generator (different seeds).
   Performance on real SOC data is unproven, and no SIEM connector exists yet. The ingestion format
   is the integration point.

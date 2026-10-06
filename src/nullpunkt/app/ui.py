@@ -8,7 +8,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from nullpunkt.app.gate import sign_out_button
+from nullpunkt.app import theme
+from nullpunkt.app.gate import sign_in_page, sign_out_button, signed_in
 from nullpunkt.app.views import STATUS_LABEL, TIER_COLOURS, TIER_MEANING
 from nullpunkt.core.config import PipelineConfig, load_pipeline_config
 from nullpunkt.storage.repository import (
@@ -20,19 +21,6 @@ from nullpunkt.storage.repository import (
 )
 
 CONFIG_PATH = Path("configs/pipeline.yaml")
-
-CSS = """
-<style>
-.block-container { padding-top: 1.2rem; max-width: 1400px; }
-.np-tier { display: inline-block; min-width: 2.4rem; text-align: center; padding: .05rem .5rem;
-           border-radius: .35rem; font-weight: 700; color: #0b1220; }
-.np-badge { display: inline-block; padding: .05rem .5rem; border-radius: .35rem;
-            border: 1px solid #334155; margin-right: .35rem; font-size: .85rem; }
-.np-verdict { font-size: 1.25rem; line-height: 1.5; border-left: 4px solid #3b82f6;
-              padding: .4rem .9rem; background: #131c2e; border-radius: .3rem; }
-.np-muted { color: #94a3b8; }
-</style>
-"""
 
 
 @st.cache_resource(show_spinner=False)
@@ -119,11 +107,16 @@ class _NoSession:
 
 def sidebar() -> Context:
     """Render the sidebar (analyst, shift, study session) and return the page context."""
+    if not signed_in():
+        # A page reached without streamlit_app.py's navigation (Streamlit serves app/pages/ by URL
+        # until st.navigation first runs) still shows only the sign-in page.
+        sign_in_page()
+        st.stop()
     repo = repository()
-    st.markdown(CSS, unsafe_allow_html=True)
+    st.markdown(theme.CSS, unsafe_allow_html=True)
     session = active_session(repo)
     with st.sidebar:
-        st.markdown("### NULLPUNKT")
+        st.markdown(theme.MARK, unsafe_allow_html=True)
         if session is not None:
             batch = repo.batch(session.batch_id)
             analyst = session.analyst
@@ -131,15 +124,10 @@ def sidebar() -> Context:
         else:
             if notice := st.session_state.pop("session_notice", None):
                 st.warning(notice)
-            # Streamlit drops widget state when switching pages, so the chosen values are kept
-            # in plain session keys and fed back as the widgets' defaults.
-            analyst = st.text_input(
-                "Analyst",
-                value=st.session_state.get("analyst_name", ""),
-                key="analyst",
-                placeholder="your name",
-            ).strip()
-            st.session_state["analyst_name"] = analyst
+            analyst = st.session_state.get("analyst_name", "")  # set by the sign-in page
+            st.markdown(f"Signed in as **{analyst}**")
+            # Streamlit drops widget state when switching pages, so the chosen shift is kept in a
+            # plain session key and fed back as the widget's default.
             batches = repo.batches()
             batch = None
             if batches:
@@ -151,8 +139,8 @@ def sidebar() -> Context:
                 st.session_state["batch_name"] = chosen
                 batch = next(b for b in batches if b.batch_id == chosen)
                 _start_form(repo, [b.batch_id for b in batches], chosen)
-            st.caption("No login: the analyst name is self-declared.")
             sign_out_button()
+            st.caption("No accounts: the analyst name is self-declared.")
     return Context(repo, batch, analyst, session)
 
 

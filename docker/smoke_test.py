@@ -4,9 +4,9 @@
         -c "nullpunkt-demo-reset && python /tmp/smoke_test.py"
 
 Renders the app headlessly on the restored demo database, so the trimmed environment (pandas,
-pyarrow, Streamlit) is exercised end to end: the queue, the top incident and the handover page.
-It makes no decisions (the handover page only audits a report export), and the container's copy
-is replaced at every start anyway.
+pyarrow, Streamlit) is exercised end to end: the sign-in page, the queue, the top incident and the
+handover page. It makes no decisions (opening INC-0055 records an opening and the handover page
+audits a report export), and the container's copy is replaced at every start anyway.
 """
 
 import sys
@@ -21,6 +21,10 @@ ZoneInfo("Asia/Kolkata")  # the demo shift's time zone must resolve inside the i
 at = AppTest.from_file(str(Path.cwd() / "app" / "streamlit_app.py"), default_timeout=60)
 at.run()
 assert not at.exception, at.exception
+assert len(at.dataframe) == 0, "the app must open on the sign-in page"
+at.text_input(key="gate_analyst").input("smoke")
+at.button[0].click().run()
+assert not at.exception, at.exception
 queue = at.dataframe[0].value
 assert len(queue) == 65, len(queue)
 assert queue["Incident"].iloc[0] == "INC-0055", queue["Incident"].iloc[0]
@@ -34,5 +38,5 @@ assert "np-verdict" in page and "INC-0055" in page
 at.switch_page("pages/handover.py").run()
 assert not at.exception, at.exception
 
-print("smoke test passed: queue (65 incidents), INC-0055 and handover render")
+print("smoke test passed: sign-in, queue (65 incidents), INC-0055 and handover render")
 sys.exit(0)

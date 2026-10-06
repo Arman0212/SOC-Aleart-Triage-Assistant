@@ -85,8 +85,11 @@ nobody has to reset it by hand.
   Print → Save as PDF.
 
 **Look.** `.streamlit/config.toml` sets a dark SOC theme (navy background, 16 px base font for
-projectors). The only accent colours are the tier colours, and a tier is always shown with its
-text label as well.
+projectors), and `src/nullpunkt/app/theme.py` adds the shared style used by the sign-in page and
+every other page: Schibsted Grotesk headings, JetBrains Mono for labels and IDs, rounded inputs,
+buttons and cards, and the ring logo in the sidebar. Apart from the tier colours, the only accent
+is the red-to-amber gradient on primary buttons. A tier is always shown with its text label as
+well. Without network the fonts fall back to the theme's sans serif.
 
 ## Decisions
 
@@ -100,7 +103,8 @@ text label as well.
 - **An incomplete decision** shows an inline error, and nothing is saved.
 - **Re-decisions** are allowed through "Change decision". The latest decision (by `decided_at`,
   then ID) sets the status; every decision is kept and audited.
-- **The analyst name** is typed into the sidebar. There's no login (see limitations).
+- **The analyst name** is entered on the sign-in page the app always opens on, and shown in the
+  sidebar next to **Sign out**. There are no accounts (see limitations).
 
 ### Capturing `opened_at` reliably
 
@@ -115,8 +119,8 @@ So the triage clock lives in the database:
    and closes the opening, all in one transaction.
 3. Viewing a decided incident never starts a timer. A re-decision starts a new opening only when
    the analyst presses "Change decision".
-4. Viewing the queue never starts a timer. Without an analyst name the incident page is
-   read-only.
+4. Viewing the queue never starts a timer, and no page is reachable before sign-in, so every
+   opening has an analyst name.
 
 Tests drive all of this with an injectable clock.
 
@@ -181,10 +185,10 @@ the detection definitions are in [study_protocol.md](study_protocol.md).
 
 ## Known limitations
 
-- **Passcode only, no per-user authentication.** The analyst name is self-declared in the
-  sidebar, and anyone with the app can decide as anyone. A hosted demo can set `DEMO_PASSCODE`
-  ([deployment.md](deployment.md#5-optional-passcode)) to keep casual visitors out; without it the
-  app is unchanged. That's acceptable for a single-laptop demo and study, not for production.
+- **No per-user authentication.** The analyst name on the sign-in page is self-declared, and
+  anyone with the app can decide as anyone. Setting `DEMO_PASSCODE` in the environment or `.env`
+  ([deployment.md](deployment.md#5-optional-passcode)) adds a shared password that keeps casual
+  visitors out; without it the sign-in page asks only for a name. That's acceptable for a single-laptop demo and study, not for production.
 - **SQLite with one writer.** It's fine for one or a few analysts on one machine; a shared
   deployment would need a server database behind the same `Repository` protocol.
 - **The elapsed-time label is static.** The timer shown on the incident page updates only on a
