@@ -15,7 +15,9 @@ Method (docs/study_protocol.md):
   under the Kaplan-Meier curve up to tau. Per participant and arm: mean over the batch's attacks;
   per arm: mean over participants. Improvement = 1 - RMST(tool) / RMST(baseline); target >= 50 %.
 - Paired comparison: exact two-sided Wilcoxon signed-rank p on per-participant RMST differences,
-  reported as descriptive only (with n = 5 the smallest possible p is 0.0625).
+  reported as descriptive only (with n pairs the smallest possible p is 2^(1-n): 0.0625 for n = 5).
+- The document states the real participant count, marks a pilot (fewer than three participants)
+  and reports participants who ran both arms on the same batch (a learning-effect risk).
 """
 
 from __future__ import annotations
@@ -101,13 +103,25 @@ class StudyResult:
             return None
         return 1 - tool / base
 
+    def participants(self) -> list[str]:
+        return sorted({r.participant for r in self.results})
+
+    def same_batch(self) -> list[tuple[ArmResult, ArmResult]]:
+        """(first arm, second arm) for participants who ran both arms on the same batch, in the
+        order they ran them (results are in session start order)."""
+        pairs = []
+        for person in self.participants():
+            rs = [r for r in self.results if r.participant == person]
+            if len(rs) == 2 and rs[0].batch_id == rs[1].batch_id:
+                pairs.append((rs[0], rs[1]))
+        return pairs
+
     def paired(self) -> list[tuple[str, float, float]]:
         """(participant, baseline RMST, tool RMST) for participants with both arms."""
         by = {(r.participant, r.arm): r for r in self.results}
-        people = sorted({r.participant for r in self.results})
         return [
             (p, by[(p, "baseline")].rmst_seconds, by[(p, "tool")].rmst_seconds)
-            for p in people
+            for p in self.participants()
             if (p, "baseline") in by and (p, "tool") in by
         ]
 
@@ -261,12 +275,27 @@ def _pct(x: float | None) -> str:
     return "–" if x is None else f"{x:.0%}"
 
 
+_NUMBERS = ("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
+
+
+def _count(n: int, noun: str) -> str:
+    """'one participant', 'five participants', '12 participants'."""
+    word = _NUMBERS[n] if n < len(_NUMBERS) else str(n)
+    return f"{word} {noun}{'' if n == 1 else 's'}"
+
+
+def _study_batches() -> set[str]:
+    return {batch for arms in SCHEDULE.values() for _, batch in arms}
+
+
 def schedule_check(study: StudyResult, repo: SQLiteRepository) -> list[str]:
-    """Differences between what was run and the pre-registered schedule."""
+    """Differences between what was run on the study batches and the pre-registered schedule.
+    Sessions on other batches (such as practice) are listed under the exclusions instead."""
     notes = []
     order: dict[str, list[tuple[str, str]]] = {}
+    study_batches = _study_batches()
     for s in repo.sessions():
-        if s.arm and s.purpose == "study" and not s.running:
+        if s.arm and s.purpose == "study" and not s.running and s.batch_id in study_batches:
             order.setdefault(s.analyst, [])
             if (s.arm, s.batch_id) not in order[s.analyst]:
                 order[s.analyst].append((s.arm, s.batch_id))
@@ -285,6 +314,7 @@ def to_markdown(study: StudyResult, repo: SQLiteRepository) -> str:
     improvement = study.improvement()
     paired = study.paired()
     p = wilcoxon_exact_p([b - t for _, b, t in paired]) if paired else None
+    n = len(study.participants())
     taus = sorted({r.tau_seconds for r in study.results})
     tau_text = ", ".join(_mmss(t) for t in taus) or "–"
     if improvement is None:
@@ -307,6 +337,7 @@ def to_markdown(study: StudyResult, repo: SQLiteRepository) -> str:
         "",
         verdict,
         "",
+        *_headline_notes(study),
         "| | Baseline (raw alert list) | Tool (Nullpunkt) |",
         "|---|---|---|",
         f"| Participants | {len(study.arm('baseline'))} | {len(study.arm('tool'))} |",
@@ -324,9 +355,7 @@ def to_markdown(study: StudyResult, repo: SQLiteRepository) -> str:
         + " |",
         "",
         f"Improvement in restricted mean time to detect: **{_pct(improvement)}**. "
-        f"Exact two-sided Wilcoxon signed-rank p on the {len(paired)} paired participants: "
-        f"{'–' if p is None else f'{p:.3f}'} (descriptive only; with n = 5 the smallest "
-        "possible p is 0.0625, so no significance claim is possible).",
+        + _p_value_text(len(paired), p),
         "",
         "## Per participant",
         "",
@@ -364,12 +393,47 @@ def to_markdown(study: StudyResult, repo: SQLiteRepository) -> str:
     deviations = schedule_check(study, repo)
     lines += ["## Schedule and exclusions", ""]
     lines += [f"- Deviation from the schedule: {d}" for d in deviations] or [
-        "- All five participants followed the pre-registered schedule."
+        "- The participant followed the pre-registered schedule."
+        if n == 1
+        else f"- All {_count(n, 'participant')} followed the pre-registered schedule."
     ]
     lines += [f"- Excluded {s.session_id} ({s.analyst}, {s.arm}, {s.batch_id}): {why}"
               for s, why in study.excluded] or ["- No sessions were excluded."]  # fmt: skip
-    lines += ["", "## Limitations", "", *LIMITATIONS]
+    lines += ["", "## Limitations", "", *limitations(study)]
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _headline_notes(study: StudyResult) -> list[str]:
+    """Warnings under the verdict: a pilot, and participants who ran both arms on one batch."""
+    n = len(study.participants())
+    notes = []
+    if 0 < n < 3:
+        notes += [
+            f"**Pilot with {_count(n, 'participant')}.** Too few participants for a study result: "
+            "the numbers show that the tooling and protocol work and give a first estimate of the "
+            "effect, not evidence that it generalises (see Limitations).",
+            "",
+        ]
+    for first, second in study.same_batch():
+        notes += [
+            f"**Deviation: {first.participant} ran both arms on {first.batch_id}** ({first.arm} "
+            f"first, then {second.arm}) instead of a different batch per arm, so learning from "
+            f"the first arm may have shortened the {second.arm} arm's times (see Limitations).",
+            "",
+        ]
+    return notes
+
+
+def _p_value_text(pairs: int, p: float | None) -> str:
+    if not pairs:
+        return "No participant completed both arms, so there is no paired comparison."
+    smallest = 2.0 ** (1 - pairs)
+    text = (
+        f"Exact two-sided Wilcoxon signed-rank p on {_count(pairs, 'paired participant')}: "
+        f"{'–' if p is None else f'{p:.3f}'} (descriptive only; with n = {pairs} the smallest "
+        f"possible p is {smallest:.4g}"
+    )
+    return text + (", so no significance claim is possible)." if smallest > 0.05 else ").")
 
 
 def _maybe_mean(values: list[float | None]) -> float | None:
@@ -391,9 +455,10 @@ def _km_text(study: StudyResult, arm: str) -> str:
 
 
 METHOD = [
-    "- **Design:** crossover. Each participant did one 15-minute arm on each study batch, in the "
-    "pre-registered order. study-A (seed 42) holds SCN-01, SCN-03, SCN-05 and SCN-07; study-B "
-    "(seed 2026) holds SCN-02, SCN-04 and SCN-06, so nobody saw an attack type twice.",
+    "- **Design (pre-registered):** crossover. Each participant does one 15-minute arm on each "
+    "study batch, in a counterbalanced order. study-A (seed 42) holds SCN-01, SCN-03, SCN-05 and "
+    "SCN-07; study-B (seed 2026) holds SCN-02, SCN-04 and SCN-06, so nobody sees an attack type "
+    "twice. What was actually run is under Schedule and exclusions.",
     "- **Detection:** tool arm, the first approve, edit or escalate on an incident containing "
     "any alert of the attack; baseline arm, the first flag on any alert of the attack (lenient "
     "towards the baseline). Time is measured from session start, so scanning the list or queue "
@@ -410,15 +475,83 @@ METHOD = [
     "sessions and is not part of these times.",
 ]
 
+
+def limitations(study: StudyResult) -> list[str]:
+    """The Limitations section, worded for the sessions actually analysed."""
+    n = len(study.participants())
+    lines = [
+        f"- **Small n.** {_count(n, 'participant').capitalize()}; no significance claim is "
+        "possible (see the p-value note)."
+        + (" This is a pilot, not a study result." if 0 < n < 3 else ""),
+        "- **Synthetic data.** Attacks and noise come from our own generator, and the system was "
+        "tuned on data from the same generator (other seeds), so real-world performance may "
+        "differ.",
+    ]
+    attacks = {r.batch_id: r.attacks for r in study.results}
+    if len(attacks) == 1:
+        ((batch, k),) = attacks.items()
+        others = sorted(_study_batches() - {batch})
+        lines.append(
+            f"- **One batch.** Only {batch} was analysed, so the result covers its "
+            f"{_count(k, 'attack')}"
+            + (f" and says nothing about the attacks in {', '.join(others)}." if others else ".")
+        )
+    elif attacks:
+        uses = {arm: Counter(r.batch_id for r in study.arm(arm)) for arm in ARMS}
+        lines.append(
+            "- **Unequal batches.** "
+            + ", ".join(f"{b} has {_count(k, 'attack')}" for b, k in sorted(attacks.items()))
+            + "; counterbalancing puts each batch in both arms, but "
+            + ("here the arms used the batches equally." if uses["baseline"] == uses["tool"]
+               else f"with {_count(n, 'participant')} the split is uneven, so part of the "
+               "difference may come from the batches.")
+        )  # fmt: skip
+    both = {person for person, _, _ in study.paired()}
+    firsts = {r.participant: r.arm for r in reversed(study.results) if r.participant in both}
+    if len(set(firsts.values())) == 1:
+        first = next(iter(firsts.values()))
+        second = next(a for a in ARMS if a != first)
+        effect = (
+            "and may inflate the improvement"
+            if second == "tool"
+            else "which makes the improvement conservative"
+        )
+        who = "The participant" if len(firsts) == 1 else "Every participant"
+        lines.append(
+            "- **Learning effects.** The second arm benefits from practice with the task. "
+            f"{who} ran the {first} arm first, so practice favours the {second} arm {effect}; "
+            "counterbalancing could not spread it over both arms."
+        )
+    elif firsts:
+        lines.append(
+            "- **Learning effects.** The second arm benefits from practice with the task, "
+            "whichever arm it is; counterbalancing spreads this over both arms but cannot remove "
+            f"it with n = {len(firsts)}."
+        )
+    for first, second in study.same_batch():
+        favours = (
+            "This favours the tool arm, so the improvement may be overstated."
+            if second.arm == "tool"
+            else "This favours the baseline arm, so the improvement may be understated."
+        )
+        missed = (
+            f" {first.participant} detected no attacks in the first arm, which limits this risk "
+            "but does not remove it."
+            if first.detected == 0
+            else ""
+        )
+        lines.append(
+            f"- **Same batch in both arms.** {first.participant} ran the {first.arm} arm and then "
+            f"the {second.arm} arm on {first.batch_id}, instead of a different batch per arm as "
+            "pre-registered. In the second arm they had already spent up to "
+            f"{_mmss(first.tau_seconds)} on the same alerts, hosts, users and attacks, so "
+            "recognising them, not only the tool, may have shortened the second arm's times. "
+            f"{favours}{missed}"
+        )
+    return lines + LIMITATIONS
+
+
 LIMITATIONS = [
-    "- **Small n.** Five participants; no significance claim is possible (see the p-value note).",
-    "- **Synthetic data.** Attacks and noise come from our own generator, and the system was "
-    "tuned on data from the same generator (other seeds), so real-world performance may differ.",
-    "- **Unequal batches.** study-A has four attacks and study-B three; counterbalancing puts "
-    "each batch in both arms, but with five participants the split is uneven (P5 repeats P1's "
-    "order and batches).",
-    "- **Learning effects.** The second arm benefits from practice with the task, whichever arm "
-    "it is; counterbalancing spreads this over both arms but cannot remove it with n = 5.",
     "- **Priming.** Participants saw the Round 1 deck, which describes the product's goal and may "
     "prime them to look for low-severity activity on critical assets. This affects both arms "
     "equally.",

@@ -174,6 +174,8 @@ def test_simulated_study_and_results_document(prepared, tmp_path, labels, batche
     assert "All five participants followed the pre-registered schedule." in text
     assert "Excluded S001 (DRY, tool, study-A): purpose dry-run" in text
     assert "Round 1 deck" in text and "smallest possible p is 0.0625" in text
+    assert "on five paired participants" in text and "- **Small n.** Five participants;" in text
+    assert "Pilot" not in text and "Same batch in both arms" not in text
     repo.close()
     out = tmp_path / "mttt_study.md"
     args = ["--db", str(db), "--out", str(out)]
@@ -197,6 +199,8 @@ def test_target_not_met_is_reported_honestly(prepared, tmp_path, labels):
     assert study.improvement() == 0
     text = to_markdown(study, repo)
     assert "**Target not met**" in text and "P3: planned" in text
+    assert "**Pilot with two participants.**" in text and "with n = 2 the smallest" in text
+    assert "five" not in text.lower() and "Same batch in both arms" not in text
     repo.close()
 
 

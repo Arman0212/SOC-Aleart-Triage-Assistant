@@ -28,10 +28,11 @@ number below is what the screen shows.
 | 0:50–1:40 | Incident INC-0055 | "Phi, running locally, wrote this verdict: *the account jill.rhodes is likely compromised with access to a critical database, risking data theft*. Every host, user and technique in it was checked against the incident before it reached this screen. **Why grouped**: each link has a reason, same user, minutes apart. **The score** is broken into severity × criticality, how far along the kill chain it got, and novelty, so the analyst can argue with it." | Open INC-0055. Show the verdict and its badges, then scroll to *Why these alerts are grouped* and the score breakdown, then the timeline (phishing attachment → PowerShell from Excel → new login to FINDB01 → admin share → 12 GB read). |
 | 1:40–2:05 | Decision bar | "The analyst decides; the model never does. Approve, edit, dismiss with a reason, or escalate. The triage time is recorded in the database from open to decision." | Click **Approve**. Show the success line "by demo" and the *Decided* 1 / 65 count. |
 | 2:05–2:30 | Handover | "At shift end, the handover writes itself from the decisions: Markdown or print-ready HTML." | Open **Handover**. Show INC-0055 with its final brief and click **Download Markdown**. |
-| 2:30–3:00 | README results | "On the held-out demo shift, **all 7 injected attacks are in our top 10; severity-only puts none there**. **10 of 10 briefs** passed validation, and a prompt-injection alert was ignored. In our before/after study, analysts [**MTTT study headline from docs/mttt_study.md**]. 3,000 alerts, one analyst, and the right incident first." | Show the results table (screenshot or README). |
+| 2:30–3:00 | README results | "On the held-out demo shift, **all 7 injected attacks are in our top 10; severity-only puts none there**. **10 of 10 briefs** passed validation, and a prompt-injection alert was ignored. **In a one-participant pilot, time to detect fell 76%** (15:00 → 3:36); **4/4 attacks found with Nullpunkt vs 0/4** with the raw alert list; false alarms 53 → 8. Not a statistically significant result; a fuller study is future work. 3,000 alerts, one analyst, and the right incident first." | Show the results table (screenshot or README). |
 
-**Fill in the study line** from `docs/mttt_study.md` once the sessions have run. Say the RMST for
-each arm and whether the ≥ 50 % target was met, exactly as the document states it.
+**The study line** comes from `docs/mttt_study.md`. Say "one-participant pilot" and "not
+significant" every time, and don't round 76% up or drop the caveat to save seconds. If a judge
+asks, the next question below has the full answer.
 
 ## 30-second fallback (laptop or Wi-Fi fails)
 
@@ -45,6 +46,22 @@ Use the screenshots, or no screen at all. Say:
 > the data, and the analyst approves, edits or dismisses it. Then the shift handover writes itself."
 
 ## Likely judge questions
+
+**"How much time does it actually save?"**
+In a one-participant pilot, time to detect fell 76% (15:00 → 3:36); 4/4 attacks found with
+Nullpunkt vs 0/4 with the raw alert list; false alarms 53 → 8. Not a statistically significant
+result; a fuller study is future work. Time to detect is the restricted mean over the four attacks
+in a 15-minute time box: with the raw list the participant found none, so every attack counts as
+the full 15:00. With Nullpunkt, the first decision on an opened incident took 0:44 on average.
+Brief generation (about 3–6 minutes per batch) runs before the shift and isn't in these times.
+**Honest limits:**
+- It's one person.
+- They ran both arms on the same batch, with the alert list first and Nullpunkt second, instead of
+  a fresh batch for the second arm as planned. Some of the gain may be familiarity.
+- With n = 1 no p-value can mean anything.
+
+The protocol is written for five counterbalanced participants on two batches; running it is the
+next step.
 
 **"How do you stop the model hallucinating?"**
 Phi only writes the text. The grouping, ranking and ATT&CK mapping are deterministic code. Every

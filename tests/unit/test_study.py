@@ -8,12 +8,15 @@ from nullpunkt.briefing.llm import FakeClient, LLMError
 from nullpunkt.core.config import PipelineConfig
 from nullpunkt.evaluation.mttt_study import (
     ArmResult,
+    StudyResult,
     km_median,
+    schedule_check,
+    to_markdown,
     wilcoxon_exact_p,
 )
 from nullpunkt.evaluation.sweep_correlation import make_batch
 from nullpunkt.pipeline import process
-from nullpunkt.storage.repository import DecisionError, SQLiteRepository
+from nullpunkt.storage.repository import DecisionError, SessionRecord, SQLiteRepository
 
 T0 = datetime(2026, 10, 1, 9, 0, tzinfo=UTC)
 B = "batch-042"
@@ -225,3 +228,95 @@ def test_wilcoxon_exact_p():
     assert wilcoxon_exact_p([5, -4, 3, -2, 1]) == pytest.approx(0.8125)
     assert wilcoxon_exact_p([0, 0]) is None
     assert wilcoxon_exact_p([2, 2, -2]) == pytest.approx(1.0)
+
+
+# --- results document ------------------------------------------------------------------------
+
+
+class SessionsOnly:
+    """Just enough repository for the schedule check."""
+
+    def __init__(self, sessions: list[SessionRecord] | None = None) -> None:
+        self._sessions = sessions or []
+
+    def sessions(self) -> list[SessionRecord]:
+        return self._sessions
+
+
+A = {"SCN-01": None, "SCN-03": None, "SCN-05": None, "SCN-07": None}
+
+
+def scored(person, arm_name, batch, detections, sid, fp=0) -> ArmResult:
+    return ArmResult(person, arm_name, batch, sid, 900, detections, fp, 0)
+
+
+def pilot() -> StudyResult:
+    """The real pilot's shape: P1 ran both arms on study-A, baseline first."""
+    found = {"SCN-01": 82.0, "SCN-03": 220.0, "SCN-05": 270.0, "SCN-07": 292.0}
+    return StudyResult([
+        scored("P1", "baseline", "study-A", dict(A), "S004", fp=53),
+        scored("P1", "tool", "study-A", found, "S005", fp=8),
+    ])  # fmt: skip
+
+
+def test_pilot_document_states_the_real_participant_count():
+    text = to_markdown(pilot(), SessionsOnly())
+    assert "**Pilot with one participant.**" in text
+    assert "- **Small n.** One participant;" in text and "This is a pilot" in text
+    assert "on one paired participant: 1.000" in text
+    assert "with n = 1 the smallest possible p is 1, so no significance claim" in text
+    assert "five" not in text.lower() and "n = 5" not in text
+    assert "- **One batch.** Only study-A was analysed" in text and "study-B" in text
+
+
+def test_same_batch_in_both_arms_is_reported_with_the_learning_risk():
+    study = pilot()
+    first, second = study.same_batch()[0]
+    assert (first.arm, second.arm, first.batch_id) == ("baseline", "tool", "study-A")
+    text = to_markdown(study, SessionsOnly())
+    assert "**Deviation: P1 ran both arms on study-A** (baseline first, then tool)" in text
+    assert "- **Same batch in both arms.** P1 ran the baseline arm and then the tool arm" in text
+    assert "This favours the tool arm, so the improvement may be overstated." in text
+    assert "P1 detected no attacks in the first arm" in text
+    assert "The participant ran the baseline arm first, so practice favours the tool arm" in text
+
+
+def test_no_pilot_or_same_batch_notes_for_a_full_crossover():
+    rows = []
+    for i, (person, arms) in enumerate(
+        {"P1": ("baseline", "tool"), "P2": ("tool", "baseline"), "P3": ("baseline", "tool")}.items()
+    ):
+        batches = ("study-A", "study-B") if i % 2 == 0 else ("study-B", "study-A")
+        for j, (arm_name, batch) in enumerate(zip(arms, batches, strict=True)):
+            rows.append(scored(person, arm_name, batch, {"SCN-01": None}, f"S{i}{j}"))
+    study = StudyResult(rows)
+    assert study.same_batch() == []
+    text = to_markdown(study, SessionsOnly())
+    assert "Pilot" not in text and "Same batch" not in text and "Deviation: P" not in text
+    assert "- **Small n.** Three participants;" in text
+    assert "on three paired participants" in text and "smallest possible p is 0.25" in text
+    assert "whichever arm it is; counterbalancing spreads this over both arms" in text
+
+
+def test_p_value_note_drops_the_no_significance_clause_once_it_is_possible():
+    rows = [scored(f"P{i}", arm_name, "study-A", {"SCN-01": None}, f"S{i}{arm_name}")
+            for i in range(6) for arm_name in ("baseline", "tool")]  # fmt: skip
+    text = to_markdown(StudyResult(rows), SessionsOnly())
+    assert "with n = 6 the smallest possible p is 0.03125)." in text
+    assert "so no significance claim is possible)" not in text
+
+
+def test_schedule_check_ignores_sessions_outside_the_study_batches():
+    def session(sid, batch, arm_name, minute):
+        start = T0 + timedelta(minutes=minute)
+        return SessionRecord(sid, "P1", batch, start, start + timedelta(minutes=15), arm_name,
+                             "study", BOX, "timed_out")  # fmt: skip
+
+    repo = SessionsOnly([
+        session("S001", "practice", "baseline", 0),
+        session("S002", "study-A", "baseline", 20),
+        session("S003", "study-A", "tool", 40),
+    ])  # fmt: skip
+    notes = schedule_check(pilot(), repo)
+    p1 = next(n for n in notes if n.startswith("P1:"))
+    assert "practice" not in p1 and "ran [('baseline', 'study-A'), ('tool', 'study-A')]" in p1
