@@ -1,0 +1,3 @@
+# Check out text files with LF on every OS. The writer tests compare their output with the
+# committed data/sample files byte for byte, and core.autocrlf on Windows would turn those CRLF.
+* text=auto eol=lf

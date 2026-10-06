@@ -53,7 +53,7 @@ TRUTH_FILES = ("labels.csv", "manifest.json")
 
 def imported_names(path: Path) -> set[str]:
     names: set[str] = set()
-    for node in ast.walk(ast.parse(path.read_text())):
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
         if isinstance(node, ast.Import):
             names.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
@@ -75,8 +75,8 @@ def modules_outside(allowed: set[str]) -> list[Path]:
 
 def module_id(path: Path) -> str:
     if path.is_relative_to(APP_ROOT):
-        return "repo:app/" + str(path.relative_to(APP_ROOT))
-    return str(path.relative_to(PACKAGE_ROOT))
+        return "repo:app/" + path.relative_to(APP_ROOT).as_posix()
+    return path.relative_to(PACKAGE_ROOT).as_posix()
 
 
 @pytest.mark.parametrize("path", modules_outside(LABEL_ACCESS), ids=module_id)
@@ -85,7 +85,7 @@ def test_pipeline_code_never_touches_ground_truth(path):
     names = imported_names(path)
     assert "GroundTruth" not in names
     assert not any(n.startswith("nullpunkt.evaluation") for n in names)
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     for name in TRUTH_FILES:
         assert name not in text
 
