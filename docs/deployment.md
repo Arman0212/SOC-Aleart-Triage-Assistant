@@ -150,9 +150,9 @@ az containerapp env create \
   --logs-destination none
 ```
 
-Create the app **with the passcode gate on from the start** (step 5 explains it), so the public
-URL never exists without it. `read -s` keeps the passcode out of the screen and the shell
-history; the history only records the literal `$DEMO_PASS`:
+Create the app **with the team password on from the start** (step 5 explains it), so strangers
+who find the public URL can never register. `read -s` keeps the password out of the screen and
+the shell history; the history only records the literal `$DEMO_PASS`:
 
 ```bash
 read -s "DEMO_PASS?Passcode: " && echo    # zsh; in bash: read -s -p "Passcode: " DEMO_PASS && echo
@@ -170,7 +170,8 @@ az containerapp create \
 unset DEMO_PASS
 ```
 
-To deploy without the gate, leave out `--secrets` and `--env-vars`.
+To leave registration open to anyone, leave out `--secrets` and `--env-vars`. Either way, add
+the email secrets from step 5 before anyone registers.
 
 The command prints the app's hostname. To see it again:
 
@@ -183,20 +184,23 @@ echo "https://$(az containerapp show --name $APP --resource-group $RG \
 normally after that; to avoid the wait on demo day, keep one replica warm
 ([Operate it](#6-operate-it)).
 
-## 5. Optional passcode
+## 5. Sign-in, team password and email
 
-The app always opens on a sign-in page that asks for the analyst name. If `DEMO_PASSCODE` is set,
-that page also asks for this shared password (its field is labelled **Password**), and nothing else
-is shown until the right one is entered in that browser session. It keeps casual visitors away
-from a public URL. **Sign out** in the sidebar returns to the sign-in page.
+The app always opens on a sign-in page, and nothing else is shown until an analyst signs in with
+their own account ([analyst_app.md](analyst_app.md#sign-in-and-accounts)). Creating an account
+emails a code to confirm the address, and a forgotten password is reset with an emailed code.
 
-- It is **not** per-user authentication; the analyst name is still self-declared.
-- The data is synthetic, and a restart resets it.
-- Without the variable, the sign-in page asks only for a name, including in study mode.
-- Locally, set it in `.env` (`DEMO_PASSCODE=...`); a variable in the environment takes precedence.
+- **Team password.** If `DEMO_PASSCODE` is set, creating an account also asks for it, so only
+  people who were given it can register. Signing in needs only the account's own password.
+- **Email is required on Azure.** Without `SMTP_USER` and `SMTP_PASSWORD`, nobody can register or
+  reset a password there (see below).
+- **Accounts reset with the app.** The container's disk is wiped on every restart, new revision
+  and scale-to-zero, so the accounts database starts empty and people register again. The demo
+  shift resets the same way.
+- Locally, set the same variables in `.env`; a variable in the environment takes precedence.
 
-The passcode is stored as a Container Apps secret, not a plain environment variable. Step 4 sets
-it at creation. To add it to an app created without it:
+The team password is stored as a Container Apps secret, not a plain environment variable. Step 4
+sets it at creation. To add it to an app created without it:
 
 ```bash
 read -s "DEMO_PASS?Passcode: " && echo    # zsh; in bash: read -s -p "Passcode: " DEMO_PASS && echo
@@ -207,12 +211,27 @@ az containerapp update --name $APP --resource-group $RG \
   --set-env-vars DEMO_PASSCODE=secretref:demo-passcode
 ```
 
-- **To change the passcode:** run the `read -s` and `secret set` lines again, then restart the
-  revision (step 6).
-- **To remove the gate:**
+- **To change it:** run the `read -s` and `secret set` lines again, then restart the revision
+  (step 6).
+- **To open registration to anyone:**
   ```bash
   az containerapp update --name $APP --resource-group $RG --remove-env-vars DEMO_PASSCODE
   ```
+
+**Email through Gmail.** Codes are sent from a Gmail account with 2-Step Verification on, using a
+Google App Password (Google account → Security → 2-Step Verification → App passwords). A normal
+Gmail password is refused. Container Apps allows outbound connections to `smtp.gmail.com:587`.
+
+```bash
+read -s "SMTP_PASS?Gmail App Password: " && echo   # bash: read -s -p "..." SMTP_PASS && echo
+az containerapp secret set --name $APP --resource-group $RG \
+  --secrets "smtp-password=$SMTP_PASS"
+unset SMTP_PASS
+az containerapp update --name $APP --resource-group $RG \
+  --set-env-vars SMTP_USER=yourteam@gmail.com SMTP_PASSWORD=secretref:smtp-password
+```
+
+Never set `MAIL_BACKEND=console` here: it writes the codes to the container log.
 
 ## 6. Operate it
 

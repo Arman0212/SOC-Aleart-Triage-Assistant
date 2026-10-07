@@ -224,3 +224,5 @@ data/generated/
 !data/demo/nullpunkt-demo.db
 .env
 .DS_Store
+# local screenshots from checking the running app
+live-check/

@@ -124,7 +124,7 @@ def sidebar() -> Context:
         else:
             if notice := st.session_state.pop("session_notice", None):
                 st.warning(notice)
-            analyst = st.session_state.get("analyst_name", "")  # set by the sign-in page
+            analyst = st.session_state.get("analyst_name", "")  # the account's username
             st.markdown(f"Signed in as **{analyst}**")
             # Streamlit drops widget state when switching pages, so the chosen shift is kept in a
             # plain session key and fed back as the widget's default.
@@ -140,7 +140,6 @@ def sidebar() -> Context:
                 batch = next(b for b in batches if b.batch_id == chosen)
                 _start_form(repo, [b.batch_id for b in batches], chosen)
             sign_out_button()
-            st.caption("No accounts: the analyst name is self-declared.")
     return Context(repo, batch, analyst, session)
 
 

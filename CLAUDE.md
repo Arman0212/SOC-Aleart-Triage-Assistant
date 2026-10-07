@@ -89,7 +89,11 @@ ingestion  correlation  attack      scoring  briefing  Streamlit + storage
   cache, evidence-based confidence). Tests never need Ollama; the one `@pytest.mark.ollama` test
   skips without it. See `docs/briefing_evaluation.md`.
 - `storage`:
-  - `db.py`: versioned SQL migrations in `storage/migrations/`
+  - `db.py`: versioned SQL migrations in `storage/migrations/` (and `account_migrations/`)
+  - `accounts.py`: `AccountStore` for analyst accounts in their own database
+    (`ACCOUNTS_DB_PATH`, default `data/generated/accounts.db`, untouched by demo resets): scrypt
+    password hashes, emailed 6-digit codes (hashed, 10 min, 5 tries, once), log-in lock, and the
+    `nullpunkt-add-analyst` CLI for confirmed accounts without email
   - `repository.py`: the `Repository` protocol and `SQLiteRepository` (shifts, decisions with
     DB-captured `opened_at`, study sessions, append-only audit log). Study sessions (migration
     002) have an arm, purpose and time box that the repository enforces at the exact deadline.
@@ -100,9 +104,13 @@ ingestion  correlation  attack      scoring  briefing  Streamlit + storage
     `data/demo/nullpunkt-demo.db` (seed 42, Phi briefs, no analyst activity), which is rebuilt by
     `scripts/make_demo_db.py` from the brief cache
 - `app` (logic, `src/nullpunkt/app/`):
-  - `gate.py`: the sign-in page the app always opens on (analyst name, plus the `DEMO_PASSCODE`
-    passcode when set) and the sidebar Sign out button. `tests/conftest.py` unsets
-    `DEMO_PASSCODE` for every test; tests that are not about sign-in pre-set `SIGNED_IN`
+  - `gate.py`: the sign-in page the app always opens on (sign in, register with the
+    `DEMO_PASSCODE` team password when set, confirm email, forgot and reset password) and the
+    sidebar Sign out button. `tests/conftest.py` gives every test an empty accounts database,
+    `MAIL_BACKEND=memory` and no `DEMO_PASSCODE`; tests that are not about sign-in pre-set
+    `SIGNED_IN`
+  - `mail.py`: emails the codes through Gmail SMTP (`SMTP_USER`, `SMTP_PASSWORD` = a Google App
+    Password), or `MAIL_BACKEND=console` / `memory` locally and in tests
   - `theme.py`: the shared CSS (fonts, ring logo, rounded inputs and cards, gradient primary
     buttons) for the sign-in page and every other page
   - `metrics.py`: first-decision MTTT, shift stats (per scope), `session_metrics`
@@ -179,6 +187,7 @@ python -m nullpunkt.evaluation.mttt_study --db data/generated/study.db \
     --batch study-A=data/generated/study-A --batch study-B=data/generated/study-B
                                    # study results -> docs/mttt_study.md (after the sessions)
 nullpunkt-demo-reset --db data/generated/demo.db                    # pristine demo shift copy
+nullpunkt-add-analyst demo --email demo@example.com                 # confirmed account, no email
 python scripts/make_demo_db.py                                      # rebuild the committed demo DB
 pytest --cov=nullpunkt --cov-report=term                            # coverage
 python -m nullpunkt.evaluation.sweep_correlation   # re-tune correlation (~4-5 min)
@@ -187,8 +196,9 @@ ruff format .                # format (CI runs `ruff format --check .`)
 ```
 
 Configuration comes from `.env` (copy `.env.example`): `OLLAMA_MODEL`, `OLLAMA_HOST`, `DB_PATH`,
-and `DEMO_PASSCODE` (the shared sign-in password; unset means name only). In deployment, the
-container reads `DEMO_PASSCODE` and `DEMO_PRISTINE_DB` from its environment.
+`ACCOUNTS_DB_PATH`, `DEMO_PASSCODE` (team password for registering; unset means open),
+`SMTP_USER`, `SMTP_PASSWORD`, `SMTP_HOST`, `SMTP_PORT`, `MAIL_FROM` and `MAIL_BACKEND`. In
+deployment, the container reads the same from its environment, plus `DEMO_PRISTINE_DB`.
 
 ## Conventions
 

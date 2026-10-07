@@ -45,6 +45,33 @@ nobody has to reset it by hand.
 - `alert_flagged`
 - `report_exported`
 
+## Sign-in and accounts
+
+The app always opens on the sign-in page (`app/gate.py`); no other page renders before sign-in,
+even when reached by URL. Each analyst has an account in a separate accounts database
+(`storage/accounts.py`, `ACCOUNTS_DB_PATH`), so resetting the demo shift keeps the accounts.
+
+| Screen | Asks for | Then |
+|---|---|---|
+| Sign in | username or email, password | the queue; the username goes on every decision |
+| Create an account | username, email, password twice, team password if `DEMO_PASSCODE` is set | a code is emailed |
+| Confirm your email | the 6-digit code | signed in |
+| Forgot password | username or email | a code is emailed, if a confirmed account matches |
+| Choose a new password | the code, new password twice | back to sign in |
+
+- **Passwords** are stored as salted scrypt hashes; codes as SHA-256 hashes. Neither is kept in
+  clear, and typed passwords are dropped from the session on sign-in.
+- **Codes** have 6 digits, expire after 10 minutes, allow 5 tries and work once. A new one can be
+  asked for once a minute, and it retires the old one.
+- **Five wrong passwords** in a row lock the account for 15 minutes; a password reset lifts it.
+- **No account guessing.** A wrong password reads the same as an unknown account, and the
+  forgot-password screens say the same thing either way. Only registration says that a username
+  or address is taken.
+- **Email** goes through Gmail (`app/mail.py`): `SMTP_USER` and a Google App Password in
+  `SMTP_PASSWORD`. Without them, registration and reset explain that email isn't set up, and
+  `nullpunkt-add-analyst NAME --email ADDRESS` creates a confirmed account from the command line.
+  `MAIL_BACKEND=console` prints the emails in the terminal for local testing.
+
 ## Pages
 
 **Queue**
@@ -103,8 +130,7 @@ well. Without network the fonts fall back to the theme's sans serif.
 - **An incomplete decision** shows an inline error, and nothing is saved.
 - **Re-decisions** are allowed through "Change decision". The latest decision (by `decided_at`,
   then ID) sets the status; every decision is kept and audited.
-- **The analyst name** is entered on the sign-in page the app always opens on, and shown in the
-  sidebar next to **Sign out**. There are no accounts (see limitations).
+- **The analyst** is the signed-in account's username, shown in the sidebar next to **Sign out**.
 
 ### Capturing `opened_at` reliably
 
@@ -185,10 +211,11 @@ the detection definitions are in [study_protocol.md](study_protocol.md).
 
 ## Known limitations
 
-- **No per-user authentication.** The analyst name on the sign-in page is self-declared, and
-  anyone with the app can decide as anyone. Setting `DEMO_PASSCODE` in the environment or `.env`
-  ([deployment.md](deployment.md#5-optional-passcode)) adds a shared password that keeps casual
-  visitors out; without it the sign-in page asks only for a name. That's acceptable for a single-laptop demo and study, not for production.
+- **Accounts, not roles.** Every account can do everything; there's no admin role, and a session
+  that is already signed in is not ended by a password reset elsewhere. Registration is open to
+  anyone who can reach the app, unless `DEMO_PASSCODE`
+  ([deployment.md](deployment.md#5-sign-in-team-password-and-email)) makes it ask for a team
+  password. That's acceptable for a demo and study, not for production.
 - **SQLite with one writer.** It's fine for one or a few analysts on one machine; a shared
   deployment would need a server database behind the same `Repository` protocol.
 - **The elapsed-time label is static.** The timer shown on the incident page updates only on a

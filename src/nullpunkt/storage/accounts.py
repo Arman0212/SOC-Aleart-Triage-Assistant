@@ -158,6 +158,12 @@ class AccountStore:
     def close(self) -> None:
         self._conn.close()
 
+    def __enter__(self) -> AccountStore:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
     def now(self) -> datetime:
         return self._clock().astimezone(UTC)
 

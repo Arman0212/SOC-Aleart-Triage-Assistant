@@ -158,7 +158,7 @@ def test_no_timer_before_sign_in(db):
     at.session_state["incident_id"] = "INC-0055"
     at.switch_page("pages/incident.py").run()
     assert not at.exception
-    assert at.text_input(key="gate_analyst").value == ""
+    assert at.text_input(key="login_id").value == ""
     assert not any("Evidence timeline" in m.value for m in at.markdown)
     repo = SQLiteRepository(db)
     assert [e["event"] for e in repo.audit(B)] == ["shift_prepared"]

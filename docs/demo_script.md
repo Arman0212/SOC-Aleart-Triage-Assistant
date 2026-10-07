@@ -11,11 +11,17 @@ number below is what the screen shows.
    nullpunkt-demo-reset --db data/generated/demo.db
    DB_PATH=data/generated/demo.db streamlit run app/streamlit_app.py
    ```
-   For the cloud copy, restart the revision instead ([deployment.md](deployment.md#6-operate-it)).
-2. **Warm the app.** Sign in as `warmup`, open INC-0055 once, and click **Sign out**. Timers are
+   For the cloud copy, restart the revision instead ([deployment.md](deployment.md#6-operate-it));
+   that also empties its accounts, so register `warmup` and `demo` there again afterwards.
+2. **Have two accounts.** Locally, once (accounts survive the reset), with any addresses:
+   ```bash
+   nullpunkt-add-analyst warmup --email warmup@example.com
+   nullpunkt-add-analyst demo --email demo@example.com
+   ```
+3. **Warm the app.** Sign in as `warmup`, open INC-0055 once, and click **Sign out**. Timers are
    per analyst and `warmup` never decides, so this doesn't touch the demo's triage time.
-3. **Sign in as** `demo`. Keep the browser zoom at 110–125 % for the projector.
-4. **Open the fallback** in a second window: [docs/screenshots/](screenshots/) and the README
+4. **Sign in as** `demo`. Keep the browser zoom at 110–125 % for the projector.
+5. **Open the fallback** in a second window: [docs/screenshots/](screenshots/) and the README
    results table. Airplane mode is fine; the local app needs no network.
 
 ## The 3 minutes
