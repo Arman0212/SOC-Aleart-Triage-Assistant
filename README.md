@@ -130,11 +130,18 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e .
 
 nullpunkt-demo-reset --db data/generated/demo.db          # a fresh copy of the demo shift
+nullpunkt-add-analyst demo --email you@example.com        # an account (asks for a password)
 DB_PATH=data/generated/demo.db streamlit run app/streamlit_app.py
 ```
 
-Open the Queue and click **INC-0055** (P1). Type a name in the sidebar to make decisions. Run
-`nullpunkt-demo-reset` again to start over; stop the app first.
+Sign in as `demo`, then open the Queue and click **INC-0055** (P1) to make a decision. Run
+`nullpunkt-demo-reset` again to start over; stop the app first. Accounts live in their own
+database, so a reset keeps them.
+
+**Accounts by email.** To let analysts create their own accounts and reset forgotten passwords
+with a code sent by email, put a Gmail address and a Google App Password in `.env` (see
+`.env.example`). For local testing without Gmail, `MAIL_BACKEND=console` prints the emails in the
+terminal instead.
 
 **From scratch, with live briefs.** This needs [Ollama](https://ollama.com) and
 `ollama pull phi4-mini`:
@@ -209,7 +216,11 @@ python -m nullpunkt.evaluation.mttt_study --help     # study results (after the 
 | `OLLAMA_MODEL` | `phi4-mini` | Phi model used for briefs |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server |
 | `DB_PATH` | `data/generated/nullpunkt.db` | SQLite database |
-| `DEMO_PASSCODE` | unset | if set, the app asks for this passcode first (deployment) |
+| `ACCOUNTS_DB_PATH` | `data/generated/accounts.db` | analyst accounts (kept apart from shifts) |
+| `DEMO_PASSCODE` | unset | team password: if set, creating an account asks for it |
+| `SMTP_USER`, `SMTP_PASSWORD` | unset | Gmail address and App Password for emailed codes |
+| `SMTP_HOST`, `SMTP_PORT`, `MAIL_FROM` | `smtp.gmail.com`, `587`, `SMTP_USER` | other mail servers |
+| `MAIL_BACKEND` | `smtp` once `SMTP_USER` is set | `console` prints emails instead (local only) |
 
 ## Quality
 
@@ -224,9 +235,9 @@ python -m nullpunkt.evaluation.mttt_study --help     # study results (after the 
 
 ## Known gaps
 
-- **Passcode only, no per-user authentication.** `DEMO_PASSCODE` keeps casual visitors out of the
-  hosted demo, but the analyst name is self-declared and anyone past the passcode can decide as
-  anyone.
+- **Accounts, not roles.** Every analyst signs in with their own account, but all accounts can do
+  everything; there's no admin role. On the hosted demo, accounts reset whenever the app restarts
+  or scales to zero, so people register again.
 - **Synthetic data only.** Tuning and testing use shifts from our own generator (different seeds).
   Performance on real SOC data is unproven, and no SIEM connector exists yet. The ingestion format
   is the integration point.

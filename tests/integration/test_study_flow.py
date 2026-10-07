@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from nullpunkt.app.gate import SIGNED_IN
 from nullpunkt.core.config import PipelineConfig
 from nullpunkt.evaluation.ground_truth import load_ground_truth
 from nullpunkt.evaluation.mttt_study import SCHEDULE, analyse, main, to_markdown
@@ -215,8 +216,15 @@ def ui_db(prepared, tmp_path, monkeypatch):
     return db
 
 
+def signed_in(at: AppTest) -> AppTest:
+    """The facilitator has signed in (the sign-in page itself is tested in test_demo.py)."""
+    at.session_state[SIGNED_IN] = True
+    at.session_state["analyst_name"] = "facilitator"
+    return at
+
+
 def start(at: AppTest, code: str, arm: str, batch: str) -> AppTest:
-    at.run()
+    signed_in(at).run()
     at.sidebar.text_input(key="s_participant").input(code).run()
     at.sidebar.radio(key="s_arm").set_value(arm).run()
     at.sidebar.selectbox(key="s_batch").select(batch).run()
@@ -283,7 +291,7 @@ def test_expired_session_ends_itself_in_the_ui(ui_db):
     past = SQLiteRepository(ui_db, clock=lambda: datetime.now(UTC) - timedelta(hours=1))
     s = past.start_session("P4", "study-B", arm="baseline", time_box_seconds=BOX)
     past.close()
-    at = AppTest.from_file(APP, default_timeout=60)
+    at = signed_in(AppTest.from_file(APP, default_timeout=60))
     at.session_state["active_session_id"] = s.session_id
     at.run()
     assert not at.exception

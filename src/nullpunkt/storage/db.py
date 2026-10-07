@@ -26,9 +26,10 @@ class Migration:
     sql: str
 
 
-def bundled_migrations() -> list[Migration]:
-    """The package's migrations in version order (versions 1..n, no gaps)."""
-    folder = files("nullpunkt.storage").joinpath("migrations")
+def bundled_migrations(folder_name: str = "migrations") -> list[Migration]:
+    """The package's migrations in version order (versions 1..n, no gaps). The shift database
+    uses ``migrations/``; the accounts database uses ``account_migrations/``."""
+    folder = files("nullpunkt.storage").joinpath(folder_name)
     found = []
     for entry in folder.iterdir():
         match = MIGRATION_RE.match(entry.name)

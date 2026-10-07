@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from nullpunkt.app.gate import SIGNED_IN
 from nullpunkt.briefing.llm import FakeClient, LLMError
 from nullpunkt.core.config import BriefingConfig, PipelineConfig
 from nullpunkt.generator.batch import generate, write_batch
@@ -93,13 +94,18 @@ def db(prepared_db, tmp_path, monkeypatch):
     return copy
 
 
-def app() -> AppTest:
-    return AppTest.from_file(APP, default_timeout=60)
+def app(analyst: str | None = "jane") -> AppTest:
+    """The app, already signed in as ``analyst`` (None: not signed in). The sign-in page itself is
+    tested in test_demo.py."""
+    at = AppTest.from_file(APP, default_timeout=60)
+    if analyst is not None:
+        at.session_state[SIGNED_IN] = True
+        at.session_state["analyst_name"] = analyst
+    return at
 
 
-def open_incident(at: AppTest, incident_id: str, analyst: str = "jane") -> AppTest:
+def open_incident(at: AppTest, incident_id: str) -> AppTest:
     at.run()
-    at.sidebar.text_input(key="analyst").input(analyst).run()
     at.selectbox(key="open_choice").select(incident_id).run()
     at.button(key="open_incident").click().run()
     # AppTest does not keep a page switched to from inside the script for later reruns (a
@@ -145,12 +151,15 @@ def test_opening_an_incident_starts_triage_once(db):
     repo.close()
 
 
-def test_no_timer_without_an_analyst_name(db):
-    at = app()
-    at.run()
+def test_no_timer_before_sign_in(db):
+    """Even reached by URL before anything else ran (Streamlit then serves app/pages/ directly,
+    without streamlit_app.py), the incident page shows only the sign-in form and records nothing."""
+    at = app(analyst=None)
     at.session_state["incident_id"] = "INC-0055"
     at.switch_page("pages/incident.py").run()
-    assert any("Enter your analyst name" in w.value for w in at.warning)
+    assert not at.exception
+    assert at.text_input(key="login_id").value == ""
+    assert not any("Evidence timeline" in m.value for m in at.markdown)
     repo = SQLiteRepository(db)
     assert [e["event"] for e in repo.audit(B)] == ["shift_prepared"]
     repo.close()

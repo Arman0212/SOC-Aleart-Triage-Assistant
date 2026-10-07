@@ -34,6 +34,7 @@ ENV PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DB_PATH=/var/lib/nullpunkt/nullpunkt.db \
+    ACCOUNTS_DB_PATH=/var/lib/nullpunkt/accounts.db \
     DEMO_PRISTINE_DB=/app/data/demo/nullpunkt-demo.db \
     STREAMLIT_SERVER_HEADLESS=true \
     STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
